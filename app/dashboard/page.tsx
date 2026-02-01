@@ -796,12 +796,6 @@ function CustomerRow({
 
   return (
     <tr className="group hover:bg-[#111] transition-colors relative">
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-10 cursor-default"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
       <td className="px-6 py-4">
         <div className="font-medium text-white">{customer.name}</div>
         <div className="text-gray-500 text-xs">{customer.email}</div>
@@ -817,6 +811,12 @@ function CustomerRow({
         >
           <MoreHorizontal size={16} />
         </button>
+        {isOpen && (
+          <div
+            className="fixed inset-0 z-10 cursor-default"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
         {isOpen && (
           <div className="absolute right-8 top-8 z-20 w-48 rounded-lg border border-gray-800 bg-[#0A0A0A] shadow-xl animate-in fade-in zoom-in-95 duration-100 overflow-hidden">
             <div className="p-1 flex flex-col gap-0.5">
