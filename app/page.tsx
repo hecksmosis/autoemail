@@ -23,7 +23,7 @@ export default function LandingPage() {
                 />
               </svg>
             </div>
-            <span className="font-semibold tracking-tight">SaaS_App</span>
+            <span className="font-semibold tracking-tight">GerpaTech</span>
           </div>
 
           <div className="flex items-center gap-4">
@@ -134,7 +134,7 @@ export default function LandingPage() {
             Ready to grow your business?
           </h2>
           <p className="text-gray-400">
-            Join the local businesses using SaaS_App to improve their online
+            Join the local businesses using GerpaTech to improve their online
             presence effortlessly.
           </p>
           <div className="pt-4">
@@ -150,7 +150,7 @@ export default function LandingPage() {
 
       {/* --- FOOTER --- */}
       <footer className="py-12 border-t border-white/10 text-center text-gray-500 text-sm">
-        <p>© {new Date().getFullYear()} SaaS_App Inc. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} GerpaTech Inc. All rights reserved.</p>
       </footer>
     </div>
   );

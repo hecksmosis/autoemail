@@ -6,52 +6,39 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
-
 const SECRET = process.env.TRACKING_JWT_SECRET!;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
-
-  if (!token) {
-    return new NextResponse("Missing Token", { status: 400 });
-  }
+  if (!token) return new NextResponse("Missing Token", { status: 400 });
 
   let customerId: string;
+  let customUrl: string | undefined;
 
-  // 1. Verify and Decode JWT
   try {
-    const decoded = jwt.verify(token, SECRET) as { cid: string };
+    const decoded = jwt.verify(token, SECRET) as { cid: string; url?: string };
     customerId = decoded.cid;
+    customUrl = decoded.url; // Get custom URL if present
   } catch (err) {
-    return new NextResponse("Invalid or Expired Link", { status: 403 });
+    return new NextResponse("Invalid Link", { status: 403 });
   }
 
   try {
-    // 2. Fetch Tenant Info
-    const { data: customer, error: fetchError } = await supabaseAdmin
+    const { data: customer } = await supabaseAdmin
       .from("customers")
       .select(
-        `
-        id, status, tenant_id,
-        tenants ( google_review_link, business_name )
-      `,
+        "id, status, tenant_id, tenants(google_review_link, retention_link, business_name)",
       )
       .eq("id", customerId)
       .single();
+    if (!customer) return new NextResponse("Not found", { status: 404 });
 
-    if (fetchError || !customer) {
-      return new NextResponse("Customer not found", { status: 404 });
-    }
-
-    // 3. Log Interaction
     await supabaseAdmin.from("email_logs").insert({
       customer_id: customerId,
-      email_type: "review",
+      email_type: "click",
       status: "clicked",
     });
-
-    // 4. Update Status
     if (customer.status !== "reviewed") {
       await supabaseAdmin
         .from("customers")
@@ -59,17 +46,24 @@ export async function GET(request: Request) {
         .eq("id", customerId);
     }
 
-    // 5. Determine Redirect
     const tenant = customer.tenants as any;
-    let redirectUrl = tenant?.google_review_link;
+    let redirectUrl = "https://google.com";
 
-    if (!redirectUrl && tenant?.business_name) {
+    // 1. Priority: Custom URL from specific email step
+    if (customUrl) {
+      redirectUrl = customUrl;
+    }
+    // 2. Fallback: Google Review Link
+    else if (tenant?.google_review_link) {
+      redirectUrl = tenant.google_review_link;
+    }
+    // 3. Fallback: Search Query
+    else if (tenant?.business_name) {
       redirectUrl = `https://www.google.com/search?q=${encodeURIComponent(tenant.business_name + " reviews")}`;
     }
 
-    return NextResponse.redirect(redirectUrl || "https://google.com");
+    return NextResponse.redirect(redirectUrl);
   } catch (error) {
-    console.error("Tracking Error:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return new NextResponse("Server Error", { status: 500 });
   }
 }

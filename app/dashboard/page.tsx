@@ -123,7 +123,7 @@ export default function Dashboard() {
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
             <span className="font-semibold tracking-tight text-lg">
-              SaaS_App
+              GerpaTech
             </span>
             <div className="hidden md:flex items-center gap-1">
               <NavButton

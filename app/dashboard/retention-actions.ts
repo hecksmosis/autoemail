@@ -272,54 +272,42 @@ export async function updateProgramStep(
       heading: string;
       body: string;
       button_text: string;
+      button_url?: string; // <--- ADDED
     };
   },
 ) {
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
-  // 1. Update step metadata
   const stepUpdates: any = {};
   if (updates.offset_days !== undefined)
     stepUpdates.offset_days = updates.offset_days;
-  if (updates.cooldown_days !== undefined)
-    stepUpdates.cooldown_days = updates.cooldown_days;
   if (updates.enabled !== undefined) stepUpdates.enabled = updates.enabled;
 
   if (Object.keys(stepUpdates).length > 0) {
-    const { error: stepError } = await supabase
-      .from("program_steps")
-      .update(stepUpdates)
-      .eq("id", stepId);
-
-    if (stepError) throw stepError;
+    await supabase.from("program_steps").update(stepUpdates).eq("id", stepId);
   }
 
-  // 2. Update template if provided
   if (updates.template) {
-    // Get template_id from step
     const { data: step } = await supabase
       .from("program_steps")
       .select("template_id")
       .eq("id", stepId)
       .single();
-
     if (step?.template_id) {
-      const { error: templateError } = await supabase
+      await supabase
         .from("email_templates")
         .update({
           subject: updates.template.subject,
           heading: updates.template.heading,
           body: updates.template.body,
           button_text: updates.template.button_text,
+          button_url: updates.template.button_url, // <--- ADDED
         })
         .eq("id", step.template_id);
-
-      if (templateError) throw templateError;
     }
   }
 
