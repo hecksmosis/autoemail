@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin"; // Use the Admin client helper
+import { createAdminClient } from "@/lib/supabase/admin";
 import jwt from "jsonwebtoken";
 import { sendGmail } from "@/lib/google";
+import { getTemplate, compileTemplate } from "@/lib/templates";
 
-// Initialize Services
 const SECRET = process.env.TRACKING_JWT_SECRET!;
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -26,19 +26,19 @@ export async function GET(request: Request) {
   const thirtyDaysAgo = getDateStr(30);
 
   console.log(
-    `🤖 Cron Job Started. Checking for dates: ${yesterday} (Reviews) and ${thirtyDaysAgo} (Retention)`,
+    `🤖 Cron Job Started. Checking for: ${yesterday} (Reviews) and ${thirtyDaysAgo} (Retention)`,
   );
 
   try {
     // 2. Fetch Candidates
-    // We fetch customers AND their tenant details in one go
+    // We need tenant info to send the email (tokens) and generate the template
     const { data: candidates, error } = await supabase
       .from("customers")
       .select(
         `
         id, name, email, last_visit_date, status,
         tenants (
-          id, business_name, email_reply_to, google_review_link
+          id, business_name
         )
       `,
       )
@@ -51,82 +51,99 @@ export async function GET(request: Request) {
 
     // 3. Loop and Process
     for (const customer of candidates || []) {
-      const tenant = customer.tenants as any; // Type assertion helper
+      const tenant = customer.tenants as any;
 
-      // SKIP if no tenant info (orphan data)
+      // Skip if orphan data
       if (!tenant) continue;
 
       let emailType: "review" | "retention" = "review";
-      let subject = "";
-      let htmlContent = "";
+      let destParam = "google";
 
-      // Generate Secure Link
-      const token = jwt.sign({ cid: customer.id }, SECRET, { expiresIn: "7d" });
-      const magicLink = `${BASE_URL}/api/track/click?token=${token}&dest=google`;
-
-      // --- LOGIC SPLIT: REVIEW VS RETENTION ---
+      // --- LOGIC SPLIT ---
       if (customer.last_visit_date === yesterday) {
         // CASE A: REVIEW (1 Day Later)
-        // If they were already contacted or reviewed, skip (double check)
         if (customer.status !== "pending") continue;
-
         emailType = "review";
-        subject = `Quick question from ${tenant.business_name}`;
-        htmlContent = `
-          <div style="font-family: sans-serif; color: #333;">
-            <h2>Hi ${customer.name || "there"},</h2>
-            <p>Thanks for visiting <strong>${tenant.business_name}</strong> yesterday!</p>
-            <p>We would love to get your feedback.</p>
-            <div style="margin: 30px 0;">
-              <a href="${magicLink}" style="background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                Write a Review
-              </a>
-            </div>
-          </div>
-        `;
+        destParam = "google";
       } else {
         // CASE B: RETENTION (30 Days Later)
         emailType = "retention";
-        subject = `We miss you at ${tenant.business_name}!`;
-        htmlContent = `
-          <div style="font-family: sans-serif; color: #333;">
-            <h2>Hi ${customer.name || "there"},</h2>
-            <p>It's been a while since we saw you at <strong>${tenant.business_name}</strong>.</p>
-            <p>We'd love to see you again soon!</p>
-            <div style="margin: 30px 0;">
-              <a href="${magicLink}" style="background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                Book a Visit
-              </a>
-            </div>
-          </div>
-        `;
+        destParam = "retention";
       }
 
-      await sendGmail({
-        tenantId: tenant.id, // This allows the helper to lookup tokens
-        to: customer.email,
-        subject: subject,
-        html: htmlContent,
+      // 4. Prepare Dynamic Content
+      // Fetch the custom template from DB
+      const rawTemplate = await getTemplate(supabase, tenant.id, emailType);
+
+      // Fill in variables {{name}}, {{business_name}}
+      const template = compileTemplate(rawTemplate, {
+        name: customer.name || "there",
+        business_name: tenant.business_name,
       });
 
-      // 5. Update Database Logs & Status
-      await Promise.all([
-        supabase
-          .from("customers")
-          .update({
-            status: "contacted",
-            last_contacted_at: new Date().toISOString(),
-          })
-          .eq("id", customer.id),
+      // Generate Secure Tracking Link
+      const token = jwt.sign({ cid: customer.id }, SECRET, { expiresIn: "7d" });
+      const magicLink = `${BASE_URL}/api/track/click?token=${token}&dest=${destParam}`;
 
-        supabase.from("email_logs").insert({
-          customer_id: customer.id,
-          email_type: emailType,
+      // Construct HTML
+      const htmlContent = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #000;">${template.heading}</h2>
+          <p style="white-space: pre-wrap;">${template.body}</p>
+          
+          <div style="margin: 30px 0;">
+            <a href="${magicLink}" style="background-color: #000; color: #fff; padding: 14px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+              ${template.button_text}
+            </a>
+          </div>
+
+          <p style="color: #666; font-size: 14px; margin-top: 40px; border-top: 1px solid #eaeaea; padding-top: 20px;">
+            Sent by ${tenant.business_name}
+          </p>
+        </div>
+      `;
+
+      try {
+        // 5. Send via Google OAuth
+        await sendGmail({
+          tenantId: tenant.id,
+          to: customer.email,
+          subject: template.subject,
+          html: htmlContent,
+        });
+
+        // 6. Update Database
+        await Promise.all([
+          // Mark customer as contacted
+          supabase
+            .from("customers")
+            .update({
+              status: "contacted",
+              last_contacted_at: new Date().toISOString(),
+            })
+            .eq("id", customer.id),
+
+          // Log the event
+          supabase.from("email_logs").insert({
+            customer_id: customer.id,
+            email_type: emailType,
+            status: "sent",
+          }),
+        ]);
+
+        results.push({
+          email: customer.email,
           status: "sent",
-        }),
-      ]);
-
-      results.push({ email: customer.email, status: "sent", type: emailType });
+          type: emailType,
+        });
+      } catch (error: any) {
+        console.error(`Failed to send to ${customer.email}:`, error.message);
+        results.push({
+          email: customer.email,
+          status: "failed",
+          reason: error.message,
+        });
+      }
     }
 
     return NextResponse.json({ success: true, processed: results });

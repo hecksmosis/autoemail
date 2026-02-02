@@ -26,7 +26,11 @@ import {
   ShieldCheck,
   Unplug,
   Download,
+  LayoutTemplate,
+  Eye,
+  Save,
 } from "lucide-react";
+import { toast } from "sonner";
 
 // --- TYPES ---
 type Customer = {
@@ -39,15 +43,22 @@ type Customer = {
   last_contacted_at: string | null;
 };
 
+type TemplateData = {
+  subject: string;
+  heading: string;
+  body: string;
+  button_text: string;
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- STATE ---
-  const [activeTab, setActiveTab] = useState<"customers" | "settings">(
-    "customers",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "customers" | "settings" | "templates"
+  >("customers");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
@@ -70,6 +81,35 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    onConfirm: () => void;
+    variant?: "danger" | "warning";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirm",
+    onConfirm: () => {},
+    variant: "danger",
+  });
+
+  // Template states
+  const [selectedTemplateType, setSelectedTemplateType] = useState<
+    "review" | "retention"
+  >("review");
+  const [templateData, setTemplateData] = useState<TemplateData>({
+    subject: "",
+    heading: "",
+    body: "",
+    button_text: "",
+  });
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+
   // Form Data
   const [formData, setFormData] = useState({
     name: "",
@@ -77,6 +117,28 @@ export default function Dashboard() {
     date: new Date().toISOString().split("T")[0],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // --- HELPER FUNCTIONS ---
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    confirmText: string = "Confirm",
+    variant: "danger" | "warning" = "danger",
+  ) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      onConfirm,
+      variant,
+    });
+  };
+
+  const closeConfirm = () => {
+    setConfirmModal({ ...confirmModal, isOpen: false });
+  };
 
   // --- DATA FETCHING ---
   const fetchCustomers = async () => {
@@ -120,6 +182,12 @@ export default function Dashboard() {
     init();
   }, [router, supabase]);
 
+  useEffect(() => {
+    if (activeTab === "templates" && tenantId) {
+      loadTemplate(selectedTemplateType);
+    }
+  }, [activeTab, selectedTemplateType, tenantId]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
@@ -131,6 +199,66 @@ export default function Dashboard() {
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.email.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+
+  // --- TEMPLATE ACTIONS ---
+  const loadTemplate = async (type: "review" | "retention") => {
+    // Try fetch from DB
+    const { data } = await supabase
+      .from("email_templates")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("type", type)
+      .single();
+
+    if (data) {
+      setTemplateData({
+        subject: data.subject,
+        heading: data.heading,
+        body: data.body,
+        button_text: data.button_text,
+      });
+    } else {
+      // Load Defaults (Hardcoded for UI convenience)
+      const defaults =
+        type === "review"
+          ? {
+              subject: "How was your visit?",
+              heading: "Hi {{name}}! 👋",
+              body: "Thanks for visiting us recently. We'd love to know how we did.",
+              button_text: "Leave a Review",
+            }
+          : {
+              subject: "We miss you!",
+              heading: "Hi {{name}},",
+              body: "It's been a while since we saw you.",
+              button_text: "Book a Visit",
+            };
+      setTemplateData(defaults);
+    }
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!tenantId) return;
+    setIsSavingTemplate(true);
+
+    const payload = {
+      tenant_id: tenantId,
+      type: selectedTemplateType,
+      ...templateData,
+    };
+
+    // Upsert (Insert or Update)
+    const { error } = await supabase
+      .from("email_templates")
+      .upsert(payload, { onConflict: "tenant_id, type" });
+
+    setIsSavingTemplate(false);
+    if (error) {
+      toast.error("Error saving template");
+    } else {
+      toast.success("Template saved!");
+    }
+  };
 
   // --- SETTINGS ACTIONS ---
   const handleSaveSettings = async (e: FormEvent) => {
@@ -148,40 +276,72 @@ export default function Dashboard() {
       .eq("id", tenantId);
 
     setSavingSettings(false);
-    if (error) alert("Error saving settings");
-    else alert("Settings saved successfully");
+    if (error) {
+      toast.error("Error saving settings");
+    } else {
+      toast.success("Settings saved successfully");
+    }
   };
 
   const handleDisconnectGoogle = async () => {
     if (!tenantId) return;
-    if (
-      !confirm("Are you sure? We won't be able to send emails on your behalf.")
-    )
-      return;
-    setDisconnecting(true);
 
-    const { error } = await supabase
-      .from("tenants")
-      .update({
-        email_provider: "resend",
-        google_access_token: null,
-        google_refresh_token: null,
-        google_token_expiry: null,
-        google_email_address: null,
-      })
-      .eq("id", tenantId);
+    showConfirm(
+      "Disconnect Google Account",
+      "Are you sure you want to disconnect? We won't be able to send emails on your behalf until you reconnect.",
+      async () => {
+        setDisconnecting(true);
 
-    setDisconnecting(false);
-    if (error) alert("Failed to disconnect: " + error.message);
-    else setGoogleEmail(null);
+        const { error } = await supabase
+          .from("tenants")
+          .update({
+            email_provider: "resend",
+            google_access_token: null,
+            google_refresh_token: null,
+            google_token_expiry: null,
+            google_email_address: null,
+          })
+          .eq("id", tenantId);
+
+        setDisconnecting(false);
+        if (error) {
+          toast.error("Failed to disconnect: " + error.message);
+        } else {
+          setGoogleEmail(null);
+          toast.success("Google account disconnected");
+        }
+        closeConfirm();
+      },
+      "Disconnect",
+      "warning",
+    );
   };
 
   // --- CUSTOMER ACTIONS ---
-  const handleDeleteCustomer = async (id: string) => {
-    if (!confirm("Delete this customer?")) return;
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
-    const { error } = await supabase.from("customers").delete().eq("id", id);
-    if (error) fetchCustomers();
+  const handleDeleteCustomer = async (id: string, name: string) => {
+    showConfirm(
+      "Delete Customer",
+      `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      async () => {
+        // Optimistic update
+        setCustomers((prev) => prev.filter((c) => c.id !== id));
+
+        const { error } = await supabase
+          .from("customers")
+          .delete()
+          .eq("id", id);
+
+        if (error) {
+          toast.error("Failed to delete customer");
+          fetchCustomers(); // Revert on error
+        } else {
+          toast.success("Customer deleted");
+        }
+        closeConfirm();
+      },
+      "Delete",
+      "danger",
+    );
   };
 
   const handleUpdateLocal = (id: string, updates: Partial<Customer>) => {
@@ -231,6 +391,7 @@ export default function Dashboard() {
           email: formData.email,
           last_visit_date: formData.date,
         });
+        toast.success("Customer updated successfully");
       } else {
         const { data, error } = await supabase
           .from("customers")
@@ -244,10 +405,11 @@ export default function Dashboard() {
           .single();
         if (error) throw error;
         if (data) setCustomers((prev) => [data, ...prev]);
+        toast.success("Customer added successfully");
       }
       setIsModalOpen(false);
     } catch (err: any) {
-      alert(err.message);
+      toast.error(err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -261,12 +423,30 @@ export default function Dashboard() {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        await fetch("/api/customers/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rows: results.data }),
-        });
-        await fetchCustomers();
+        try {
+          const response = await fetch("/api/customers/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rows: results.data }),
+          });
+
+          if (response.ok) {
+            await fetchCustomers();
+            toast.success(
+              `Successfully uploaded ${results.data.length} customers`,
+            );
+          } else {
+            toast.error("Failed to upload CSV");
+          }
+        } catch (error) {
+          toast.error("Error uploading file");
+        } finally {
+          setUploading(false);
+          setIsDragging(false);
+        }
+      },
+      error: () => {
+        toast.error("Failed to parse CSV file");
         setUploading(false);
         setIsDragging(false);
       },
@@ -321,6 +501,12 @@ export default function Dashboard() {
               >
                 Customers
               </button>
+              <button
+                onClick={() => setActiveTab("templates")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === "templates" ? "bg-gray-800 text-white" : "text-gray-400 hover:text-white hover:bg-gray-900"}`}
+              >
+                Templates
+              </button>{" "}
               <button
                 onClick={() => setActiveTab("settings")}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === "settings" ? "bg-gray-800 text-white" : "text-gray-400 hover:text-white hover:bg-gray-900"}`}
@@ -471,6 +657,174 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* --- VIEW: TEMPLATES --- */}
+        {activeTab === "templates" && (
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Email Templates
+                </h1>
+                <p className="text-gray-400 mt-1">
+                  Design the emails your customers will receive.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedTemplateType("review")}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${selectedTemplateType === "review" ? "bg-white text-black" : "bg-[#111] text-gray-400 hover:text-white"}`}
+                >
+                  Review Email
+                </button>
+                <button
+                  onClick={() => setSelectedTemplateType("retention")}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${selectedTemplateType === "retention" ? "bg-white text-black" : "bg-[#111] text-gray-400 hover:text-white"}`}
+                >
+                  Retention Email
+                </button>
+              </div>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-8 h-[600px]">
+              {/* EDITOR COLUMN */}
+              <div className="flex flex-col gap-4">
+                <div className="bg-[#0A0A0A] border border-gray-800 rounded-xl p-6 flex-1 flex flex-col gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs uppercase font-bold text-gray-500">
+                      Email Subject
+                    </label>
+                    <input
+                      type="text"
+                      value={templateData.subject}
+                      onChange={(e) =>
+                        setTemplateData({
+                          ...templateData,
+                          subject: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[#111] border border-gray-800 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs uppercase font-bold text-gray-500">
+                      Heading
+                    </label>
+                    <input
+                      type="text"
+                      value={templateData.heading}
+                      onChange={(e) =>
+                        setTemplateData({
+                          ...templateData,
+                          heading: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[#111] border border-gray-800 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-white"
+                    />
+                    <p className="text-[10px] text-gray-500">
+                      Tip: Use {"{{name}}"} to insert customer name.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1 flex-1 flex flex-col">
+                    <label className="text-xs uppercase font-bold text-gray-500">
+                      Body Content
+                    </label>
+                    <textarea
+                      value={templateData.body}
+                      onChange={(e) =>
+                        setTemplateData({
+                          ...templateData,
+                          body: e.target.value,
+                        })
+                      }
+                      className="w-full flex-1 bg-[#111] border border-gray-800 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-white resize-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs uppercase font-bold text-gray-500">
+                      Button Text
+                    </label>
+                    <input
+                      type="text"
+                      value={templateData.button_text}
+                      onChange={(e) =>
+                        setTemplateData({
+                          ...templateData,
+                          button_text: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[#111] border border-gray-800 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-white"
+                    />
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={handleSaveTemplate}
+                      disabled={isSavingTemplate}
+                      className="w-full py-2 bg-white text-black font-semibold rounded-md hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {isSavingTemplate ? (
+                        <Loader2 className="animate-spin" size={16} />
+                      ) : (
+                        <Save size={16} />
+                      )}
+                      Save Template
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* PREVIEW COLUMN */}
+              <div className="bg-gray-900 rounded-xl border border-gray-800 p-8 flex items-center justify-center relative overflow-hidden">
+                <div className="absolute top-4 right-4 text-xs text-gray-500 font-mono flex items-center gap-2">
+                  <Eye size={12} /> LIVE PREVIEW
+                </div>
+
+                {/* Email Canvas */}
+                <div className="bg-white text-black w-full max-w-sm rounded-lg shadow-2xl overflow-hidden">
+                  {/* Fake Email Header */}
+                  <div className="bg-gray-100 p-4 border-b border-gray-200 text-xs text-gray-500">
+                    <div className="flex justify-between mb-1">
+                      <span>From:</span>{" "}
+                      <span className="text-gray-900 font-medium">
+                        Your Business
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Subject:</span>{" "}
+                      <span className="text-gray-900 font-medium">
+                        {templateData.subject.replace("{{name}}", "John")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Body */}
+                  <div className="p-8 text-center space-y-6">
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      {templateData.heading.replace("{{name}}", "John")}
+                    </h2>
+
+                    <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
+                      {templateData.body.replace("{{name}}", "John")}
+                    </p>
+
+                    <div>
+                      <button className="bg-black text-white font-bold py-3 px-6 rounded-md shadow-lg transform active:scale-95 transition-transform">
+                        {templateData.button_text}
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-gray-400 mt-8 pt-8 border-t border-gray-100">
+                      If you have issues, reply to this email.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* --- SETTINGS VIEW --- */}
         {activeTab === "settings" && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -758,6 +1112,56 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* CONFIRMATION MODAL */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-[#0A0A0A] border border-gray-800 rounded-xl shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-4">
+                <div
+                  className={`flex-shrink-0 h-12 w-12 rounded-full flex items-center justify-center ${
+                    confirmModal.variant === "danger"
+                      ? "bg-red-500/10 text-red-500"
+                      : "bg-amber-500/10 text-amber-500"
+                  }`}
+                >
+                  <AlertCircle size={24} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-white">
+                    {confirmModal.title}
+                  </h3>
+                  <p className="mt-2 text-sm text-gray-400">
+                    {confirmModal.message}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={closeConfirm}
+                  className="flex-1 h-10 rounded-md border border-gray-800 text-sm font-medium hover:bg-gray-900 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    confirmModal.onConfirm();
+                  }}
+                  className={`flex-1 h-10 rounded-md text-sm font-medium transition-colors ${
+                    confirmModal.variant === "danger"
+                      ? "bg-red-500 hover:bg-red-600 text-white"
+                      : "bg-amber-500 hover:bg-amber-600 text-black"
+                  }`}
+                >
+                  {confirmModal.confirmText}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -771,7 +1175,7 @@ function CustomerRow({
   onEdit,
 }: {
   customer: Customer;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, name: string) => void;
   onUpdate: (id: string, updates: Partial<Customer>) => void;
   onEdit: () => void;
 }) {
@@ -788,9 +1192,9 @@ function CustomerRow({
     if (result.success) {
       const now = new Date().toISOString();
       onUpdate(customer.id, { status: "contacted", last_contacted_at: now });
-      alert("Email sent successfully!");
+      toast.success("Email sent successfully!");
     } else {
-      alert("Failed to send email: " + result.error);
+      toast.error("Failed to send email: " + result.error);
     }
   };
 
@@ -845,7 +1249,7 @@ function CustomerRow({
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  onDelete(customer.id);
+                  onDelete(customer.id, customer.name);
                 }}
                 className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 rounded-md transition-colors text-left"
               >

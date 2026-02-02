@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Moon, Sun } from "lucide-react";
+import { toast } from "sonner";
 
 function LoginContent() {
   const router = useRouter();
@@ -59,36 +60,44 @@ function LoginContent() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
+    // Use toast.promise if it's a single awaitable action,
+    // but here we have logic branches, so manual toasts might be better or a promise wrapper.
+
+    // SIMPLE APPROACH:
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const promise = supabase.auth.signInWithPassword({ email, password });
+
+        toast.promise(promise, {
+          loading: "Signing in...",
+          success: (data) => {
+            if (data.error) throw data.error;
+            router.push("/dashboard");
+            return "Welcome back!";
+          },
+          error: (err) => err.message,
+        });
+      } else {
+        // Sign Up Logic
+        const promise = supabase.auth.signUp({
           email,
           password,
+          options: { data: { business_name: businessName } },
         });
-        if (error) throw error;
-        router.push("/dashboard");
-      } else {
-        // --- SIGN UP LOGIC ---
-        const { data: authData, error: authError } = await supabase.auth.signUp(
-          {
-            email,
-            password,
-            options: {
-              data: {
-                business_name: businessName,
-              },
-            },
+
+        toast.promise(promise, {
+          loading: "Creating account...",
+          success: (data) => {
+            if (data.error) throw data.error;
+            return "Account created! Check your email.";
           },
-        );
-
-        if (authError) throw authError;
-
-        alert("Account created! Please check your email to verify.");
+          error: (err) => err.message,
+        });
       }
     } catch (err: any) {
-      setError(err.message);
+      // Catch sync errors
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
