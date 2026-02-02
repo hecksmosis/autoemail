@@ -3,12 +3,14 @@ import {
   MoreHorizontal,
   Loader2,
   Trash2,
+  Zap,
   Mail,
   Pencil,
-  Calendar,
-  Tag,
   Clock,
-  Zap,
+  Calendar,
+  CheckCircle2,
+  Tag,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { sendReviewEmail } from "@/app/actions";
@@ -154,7 +156,7 @@ export function EnhancedCustomerRow({
         {new Date(customer.last_visit_date).toLocaleDateString()}
       </td>
 
-      <td className="px-6 py-4">{getStatusBadge(customer)}</td>
+      <td className="px-6 py-4">{getEngagementStatus(customer)}</td>
 
       <td className="px-6 py-4 text-right relative">
         <button
@@ -225,6 +227,56 @@ export function EnhancedCustomerRow({
         )}
       </td>
     </tr>
+  );
+}
+
+function getEngagementStatus(customer: Customer) {
+  const visitDate = new Date(customer.last_visit_date);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - visitDate.getTime());
+  const daysSinceVisit = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  let lastEmailDays = null;
+  if (customer.last_contacted_at) {
+    const contactDate = new Date(customer.last_contacted_at);
+    const contactDiff = Math.abs(now.getTime() - contactDate.getTime());
+    lastEmailDays = Math.floor(contactDiff / (1000 * 60 * 60 * 24));
+  }
+
+  // 1. Success State (Reviewed)
+  if (customer.status === "reviewed") {
+    return (
+      <div className="flex items-center gap-2 text-green-500">
+        <CheckCircle2 size={16} />
+        <span className="text-sm font-medium">Review Received</span>
+      </div>
+    );
+  }
+
+  // 2. Engagement State
+  return (
+    <div className="space-y-1.5">
+      {/* Days Journey */}
+      <div className="flex items-center gap-2 text-white">
+        <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+        <span className="text-sm font-medium">
+          Day {daysSinceVisit} of Journey
+        </span>
+      </div>
+
+      {/* Last Contact Info */}
+      <div className="flex items-center gap-1.5 text-xs text-gray-500">
+        <History size={12} />
+        {lastEmailDays !== null ? (
+          <span>
+            Email sent{" "}
+            {lastEmailDays === 0 ? "today" : `${lastEmailDays} days ago`}
+          </span>
+        ) : (
+          <span>No emails sent yet</span>
+        )}
+      </div>
+    </div>
   );
 }
 

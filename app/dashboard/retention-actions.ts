@@ -85,7 +85,9 @@ export async function getRetentionPrograms() {
   // Sort steps by step_order
   const programsWithSortedSteps = programs?.map((program) => ({
     ...program,
-    steps: program.steps?.sort((a, b) => a.step_order - b.step_order) || [],
+    steps:
+      program.steps?.sort((a: any, b: any) => a.step_order - b.step_order) ||
+      [],
   }));
 
   return programsWithSortedSteps as RetentionProgram[];

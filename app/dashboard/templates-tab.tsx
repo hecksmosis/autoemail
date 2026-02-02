@@ -33,6 +33,8 @@ import {
   type RetentionProgram,
   type ProgramStep,
 } from "./retention-actions";
+import SimpleTemplatesView from "./simple-templates-view";
+import { createClient } from "@/lib/supabase/client";
 
 type TemplateMode = "simple" | "programs";
 
@@ -41,6 +43,25 @@ export default function TemplatesTab() {
   const [programs, setPrograms] = useState<RetentionProgram[]>([]);
   const [loading, setLoading] = useState(true);
   const [serviceTags, setServiceTags] = useState<string[]>([]);
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    // Get Tenant ID for the Simple View
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        supabase
+          .from("tenants")
+          .select("id")
+          .eq("user_id", data.user.id)
+          .single()
+          .then(({ data: t }) => {
+            if (t) setTenantId(t.id);
+          });
+      }
+    });
+    loadData();
+  }, []);
 
   // Modals
   const [createProgramModal, setCreateProgramModal] = useState(false);
@@ -122,8 +143,8 @@ export default function TemplatesTab() {
       </div>
 
       {/* Content based on mode */}
-      {mode === "simple" ? (
-        <SimpleTemplatesView />
+      {mode === "simple" && tenantId ? (
+        <SimpleTemplatesView tenantId={tenantId} />
       ) : (
         <ProgramsView
           programs={programs}
@@ -165,26 +186,6 @@ export default function TemplatesTab() {
   );
 }
 
-// ========================================
-// SIMPLE TEMPLATES VIEW (Original)
-// ========================================
-function SimpleTemplatesView() {
-  return (
-    <div className="bg-[#0A0A0A] border border-gray-800 rounded-xl p-6">
-      <div className="text-center py-12 text-gray-500">
-        <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <p>Simple template editor coming soon...</p>
-        <p className="text-sm mt-2">
-          Switch to "Advanced Programs" for service-based sequences
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ========================================
-// PROGRAMS VIEW (Main List)
-// ========================================
 function ProgramsView({
   programs,
   onRefresh,
@@ -330,6 +331,10 @@ function ProgramCard({
     }
   };
 
+  const sortedSteps = program.steps?.sort(
+    (a, b) => a.offset_days - b.offset_days,
+  );
+
   return (
     <div className="bg-[#0A0A0A] border border-gray-800 rounded-xl overflow-hidden">
       {/* Header */}
@@ -434,23 +439,38 @@ function ProgramCard({
       {/* Expanded Content: Steps */}
       {isExpanded && (
         <div className="p-4 space-y-3">
-          {program.steps && program.steps.length > 0 ? (
+          {sortedSteps && sortedSteps.length > 0 ? (
             <>
-              {program.steps.map((step) => (
-                <StepCard
-                  key={step.id}
-                  step={step}
-                  programId={program.id}
-                  onRefresh={onRefresh}
-                />
+              {sortedSteps.map((step, index) => (
+                <div key={step.id} className="relative">
+                  {/* Timeline Dot */}
+                  <div className="absolute -left-[27px] top-4 h-4 w-4 rounded-full border-2 border-gray-700 bg-[#0A0A0A] z-10 flex items-center justify-center">
+                    <div
+                      className={`h-1.5 w-1.5 rounded-full ${step.enabled ? "bg-blue-500" : "bg-gray-600"}`}
+                    />
+                  </div>
+
+                  {/* The Card */}
+                  <StepCard
+                    step={step}
+                    stepNumber={index + 1} // Pass index
+                    programId={program.id}
+                    onRefresh={onRefresh}
+                  />
+                </div>
               ))}
-              <button
-                onClick={onCreateStep}
-                className="w-full h-10 border-2 border-dashed border-gray-700 rounded-md text-sm text-gray-400 hover:text-white hover:border-gray-500 transition-colors flex items-center justify-center gap-2"
-              >
-                <Plus size={16} />
-                Add Another Email Step
-              </button>
+
+              {/* Add Button connected to timeline */}
+              <div className="relative">
+                <div className="absolute -left-[27px] top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-gray-800" />
+                <button
+                  onClick={onCreateStep}
+                  className="w-full h-10 border border-dashed border-gray-800 rounded-md text-sm text-gray-500 hover:text-white hover:border-gray-600 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus size={16} />
+                  Add Email Step
+                </button>
+              </div>
             </>
           ) : (
             <div className="text-center py-8">
@@ -472,20 +492,23 @@ function ProgramCard({
 }
 
 // ========================================
-// STEP CARD (Individual Email)
+// STEP CARD (Timeline Item)
 // ========================================
 function StepCard({
   step,
+  stepNumber,
   programId,
   onRefresh,
 }: {
   step: ProgramStep;
+  stepNumber: number;
   programId: string;
   onRefresh: () => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Edit States
   const [offsetDays, setOffsetDays] = useState(step.offset_days);
   const [subject, setSubject] = useState(step.template?.subject || "");
   const [heading, setHeading] = useState(step.template?.heading || "");
@@ -493,12 +516,14 @@ function StepCard({
   const [buttonText, setButtonText] = useState(
     step.template?.button_text || "",
   );
+  const [enabled, setEnabled] = useState(step.enabled);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await updateProgramStep(step.id, {
         offset_days: offsetDays,
+        enabled,
         template: {
           subject,
           heading,
@@ -529,9 +554,11 @@ function StepCard({
 
   if (isEditing) {
     return (
-      <div className="border border-gray-700 rounded-lg p-4 bg-[#111] space-y-4">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-white">Edit Email Step</h4>
+      <div className="relative bg-[#0A0A0A] border border-blue-900/50 rounded-lg p-4 shadow-xl z-20">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-medium text-blue-400">
+            Editing Step {stepNumber}
+          </h4>
           <button
             onClick={() => setIsEditing(false)}
             className="text-gray-500 hover:text-white"
@@ -540,133 +567,166 @@ function StepCard({
           </button>
         </div>
 
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs text-gray-400 uppercase font-medium">
-              Send After (Days)
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={offsetDays}
-              onChange={(e) => setOffsetDays(parseInt(e.target.value))}
-              className="w-full h-9 px-3 mt-1 rounded-md bg-black border border-gray-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-white"
-            />
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 uppercase font-bold block mb-1">
+                Send on Day
+              </label>
+              <div className="relative">
+                <Clock
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                />
+                <input
+                  type="number"
+                  min="1"
+                  value={offsetDays}
+                  onChange={(e) => setOffsetDays(parseInt(e.target.value))}
+                  className="w-full h-9 pl-9 pr-3 rounded-md bg-[#151515] border border-gray-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 uppercase font-bold block mb-1">
+                Status
+              </label>
+              <select
+                value={enabled ? "true" : "false"}
+                onChange={(e) => setEnabled(e.target.value === "true")}
+                className="w-full h-9 px-3 rounded-md bg-[#151515] border border-gray-800 text-white text-sm focus:border-blue-500 focus:outline-none"
+              >
+                <option value="true">Active</option>
+                <option value="false">Disabled</option>
+              </select>
+            </div>
           </div>
 
+          <hr className="border-gray-800" />
+
           <div>
-            <label className="text-xs text-gray-400 uppercase font-medium">
-              Subject
+            <label className="text-xs text-gray-500 uppercase font-bold block mb-1">
+              Subject Line
             </label>
             <input
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full h-9 px-3 mt-1 rounded-md bg-black border border-gray-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-white"
+              className="w-full h-9 px-3 rounded-md bg-[#151515] border border-gray-800 text-white text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 uppercase font-medium">
+            <label className="text-xs text-gray-500 uppercase font-bold block mb-1">
               Heading
             </label>
             <input
               type="text"
               value={heading}
               onChange={(e) => setHeading(e.target.value)}
-              className="w-full h-9 px-3 mt-1 rounded-md bg-black border border-gray-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-white"
-              placeholder="Hi {{name}}!"
+              className="w-full h-9 px-3 rounded-md bg-[#151515] border border-gray-800 text-white text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 uppercase font-medium">
-              Body
+            <label className="text-xs text-gray-500 uppercase font-bold block mb-1">
+              Email Body
             </label>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={4}
-              className="w-full px-3 py-2 mt-1 rounded-md bg-black border border-gray-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-white resize-none"
+              className="w-full p-3 rounded-md bg-[#151515] border border-gray-800 text-white text-sm focus:border-blue-500 focus:outline-none resize-none"
             />
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 uppercase font-medium">
-              Button Text
+            <label className="text-xs text-gray-500 uppercase font-bold block mb-1">
+              Button Label
             </label>
             <input
               type="text"
               value={buttonText}
               onChange={(e) => setButtonText(e.target.value)}
-              className="w-full h-9 px-3 mt-1 rounded-md bg-black border border-gray-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-white"
+              className="w-full h-9 px-3 rounded-md bg-[#151515] border border-gray-800 text-white text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
-        </div>
 
-        <div className="flex gap-2 pt-2">
-          <button
-            onClick={() => setIsEditing(false)}
-            className="flex-1 h-9 rounded-md border border-gray-800 text-sm font-medium hover:bg-gray-900 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 h-9 rounded-md bg-white text-black text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {saving ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Save size={16} />
-            )}
-            Save
-          </button>
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={() => setIsEditing(false)}
+              className="flex-1 h-9 rounded-md border border-gray-800 text-sm font-medium hover:bg-gray-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 h-9 rounded-md bg-white text-black text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Save size={16} />
+              )}
+              Save Changes
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors group">
-      <div className="flex items-start justify-between">
+    <div className="bg-[#0A0A0A] border border-gray-800 rounded-lg p-5 relative group hover:border-gray-600 transition-all">
+      {/* Horizontal Connector Line (Visual only) */}
+      <div className="absolute -left-6 top-6 w-6 h-px bg-gray-800" />
+
+      <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-xs font-medium">
-              <Clock size={12} />
-              Day {step.offset_days}
+          <div className="flex items-center gap-3 mb-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#151515] border border-gray-800 text-xs font-mono font-medium text-gray-300">
+              <Clock size={12} className="text-blue-500" />
+              DAY {step.offset_days}
             </span>
             {!step.enabled && (
-              <span className="text-xs text-gray-600">(Disabled)</span>
+              <span className="text-xs text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded">
+                DISABLED
+              </span>
             )}
+            <span className="text-xs text-gray-600 font-mono">
+              STEP {stepNumber}
+            </span>
           </div>
-          <p className="text-sm text-white font-medium truncate">
-            {step.template?.subject || "No subject"}
-          </p>
-          <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-            {step.template?.body || "No content"}
+
+          <h4 className="text-base font-semibold text-white mb-1 truncate">
+            {step.template?.subject || "(No Subject)"}
+          </h4>
+          <p className="text-sm text-gray-400 line-clamp-2 leading-relaxed">
+            {step.template?.body || "(No Body Content)"}
           </p>
         </div>
-        <div className="flex items-center gap-1 ml-4">
+
+        <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => setIsEditing(true)}
-            className="p-2 text-gray-600 hover:text-white hover:bg-gray-800 rounded transition-colors opacity-0 group-hover:opacity-100"
+            className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
+            title="Edit Step"
           >
-            <Edit2 size={14} />
+            <Edit2 size={16} />
           </button>
           <button
             onClick={handleDelete}
-            className="p-2 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+            className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
+            title="Delete Step"
           >
-            <Trash2 size={14} />
+            <Trash2 size={16} />
           </button>
         </div>
       </div>
     </div>
   );
 }
-
 // ========================================
 // CREATE PROGRAM MODAL
 // ========================================
