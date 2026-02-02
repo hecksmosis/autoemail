@@ -93,17 +93,35 @@ export default function SimpleTemplatesView({
       if (tenantError) throw tenantError;
 
       // 2. Save Template
-      const { error: tmplError } = await supabase
+      const { data: existing, error: fetchError } = await supabase
         .from("email_templates")
-        .upsert(
-          {
+        .select("*")
+        .eq("type", "review")
+        .limit(1)
+        .single();
+
+      if (fetchError && fetchError.code !== "PGRST116") throw fetchError;
+
+      if (existing) {
+        // Update the existing review
+        const { data, error } = await supabase
+          .from("email_templates")
+          .update({
             tenant_id: tenantId,
             type: "review",
             ...template,
-          },
-          { onConflict: "tenant_id,type" },
-        );
-      if (tmplError) throw tmplError;
+          })
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        // Insert a new review if none exists
+        const { data, error } = await supabase.from("your_table_name").insert({
+          tenant_id: tenantId,
+          type: "review",
+          ...template,
+        });
+        if (error) throw error;
+      }
 
       toast.success("Settings saved successfully");
     } catch (e: any) {

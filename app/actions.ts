@@ -38,8 +38,12 @@ export async function sendReviewEmail(
   });
 
   // 4. Generate Link
-  const token = jwt.sign({ cid: customerId }, SECRET, { expiresIn: "7d" });
-  const magicLink = `${BASE_URL}/api/track/click?token=${token}&dest=google`;
+  const token = jwt.sign(
+    { cid: customerId, url: template.button_url },
+    SECRET,
+    { expiresIn: "7d" },
+  );
+  const magicLink = `${BASE_URL}/api/track/click?token=${token}&url=custom`;
 
   // 5. Construct Final HTML
   const htmlContent = `
