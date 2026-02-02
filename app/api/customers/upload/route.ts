@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { rows } = body; // Expecting { rows: [{ name, email, date }] }
+    const { rows } = body; // Expecting { rows: [{ name, email, date, service? }] }
 
     if (!rows || rows.length === 0) {
       return NextResponse.json({ error: "No data provided" }, { status: 400 });
@@ -40,12 +40,18 @@ export async function POST(request: Request) {
       email: row.Email || row.email,
       // Default to today if date missing, or parse it
       last_visit_date: row.Date || row.date || new Date().toISOString(),
+      service_tag: row.Service || null, // NEW: Service tag from CSV
+      status: "pending",
     }));
 
-    // 4. Batch Insert
+    // 4. Batch Insert with UPSERT to handle duplicates
+    // Using email + tenant_id as unique constraint
     const { error: insertError } = await supabase
       .from("customers")
-      .insert(customersToInsert);
+      .upsert(customersToInsert, {
+        onConflict: "email,tenant_id",
+        ignoreDuplicates: false,
+      });
 
     if (insertError) throw insertError;
 

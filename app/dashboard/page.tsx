@@ -26,11 +26,16 @@ import {
   ShieldCheck,
   Unplug,
   Download,
-  LayoutTemplate,
-  Eye,
-  Save,
+  Tag,
+  Clock,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getCustomerProgramStatus } from "./retention-actions";
+
+// Import new components
+import TemplatesTab from "./templates-tab";
+import { CSVUploadWithMapping } from "./csv-upload";
 
 // --- TYPES ---
 type Customer = {
@@ -41,6 +46,7 @@ type Customer = {
   created_at: string;
   status: "pending" | "contacted" | "reviewed";
   last_contacted_at: string | null;
+  service_tag?: string | null;
 };
 
 type TemplateData = {
@@ -48,6 +54,14 @@ type TemplateData = {
   heading: string;
   body: string;
   button_text: string;
+};
+
+type ProgramStatus = {
+  hasProgram: boolean;
+  programName: string | null;
+  nextEmailDays: number | null;
+  daysSinceVisit: number | null;
+  totalSteps?: number;
 };
 
 export default function Dashboard() {
@@ -98,23 +112,12 @@ export default function Dashboard() {
     variant: "danger",
   });
 
-  // Template states
-  const [selectedTemplateType, setSelectedTemplateType] = useState<
-    "review" | "retention"
-  >("review");
-  const [templateData, setTemplateData] = useState<TemplateData>({
-    subject: "",
-    heading: "",
-    body: "",
-    button_text: "",
-  });
-  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
-
   // Form Data
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     date: new Date().toISOString().split("T")[0],
+    service: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -182,12 +185,6 @@ export default function Dashboard() {
     init();
   }, [router, supabase]);
 
-  useEffect(() => {
-    if (activeTab === "templates" && tenantId) {
-      loadTemplate(selectedTemplateType);
-    }
-  }, [activeTab, selectedTemplateType, tenantId]);
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
@@ -199,66 +196,6 @@ export default function Dashboard() {
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.email.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-
-  // --- TEMPLATE ACTIONS ---
-  const loadTemplate = async (type: "review" | "retention") => {
-    // Try fetch from DB
-    const { data } = await supabase
-      .from("email_templates")
-      .select("*")
-      .eq("tenant_id", tenantId)
-      .eq("type", type)
-      .single();
-
-    if (data) {
-      setTemplateData({
-        subject: data.subject,
-        heading: data.heading,
-        body: data.body,
-        button_text: data.button_text,
-      });
-    } else {
-      // Load Defaults (Hardcoded for UI convenience)
-      const defaults =
-        type === "review"
-          ? {
-              subject: "How was your visit?",
-              heading: "Hi {{name}}! 👋",
-              body: "Thanks for visiting us recently. We'd love to know how we did.",
-              button_text: "Leave a Review",
-            }
-          : {
-              subject: "We miss you!",
-              heading: "Hi {{name}},",
-              body: "It's been a while since we saw you.",
-              button_text: "Book a Visit",
-            };
-      setTemplateData(defaults);
-    }
-  };
-
-  const handleSaveTemplate = async () => {
-    if (!tenantId) return;
-    setIsSavingTemplate(true);
-
-    const payload = {
-      tenant_id: tenantId,
-      type: selectedTemplateType,
-      ...templateData,
-    };
-
-    // Upsert (Insert or Update)
-    const { error } = await supabase
-      .from("email_templates")
-      .upsert(payload, { onConflict: "tenant_id, type" });
-
-    setIsSavingTemplate(false);
-    if (error) {
-      toast.error("Error saving template");
-    } else {
-      toast.success("Template saved!");
-    }
-  };
 
   // --- SETTINGS ACTIONS ---
   const handleSaveSettings = async (e: FormEvent) => {
@@ -356,6 +293,7 @@ export default function Dashboard() {
       name: "",
       email: "",
       date: new Date().toISOString().split("T")[0],
+      service: "",
     });
     setIsModalOpen(true);
   };
@@ -366,6 +304,7 @@ export default function Dashboard() {
       name: customer.name,
       email: customer.email,
       date: customer.last_visit_date,
+      service: customer.service_tag || "",
     });
     setIsModalOpen(true);
   };
@@ -383,6 +322,7 @@ export default function Dashboard() {
             name: formData.name,
             email: formData.email,
             last_visit_date: formData.date,
+            service_tag: formData.service || null,
           })
           .eq("id", editingCustomer.id);
         if (error) throw error;
@@ -390,6 +330,7 @@ export default function Dashboard() {
           name: formData.name,
           email: formData.email,
           last_visit_date: formData.date,
+          service_tag: formData.service || null,
         });
         toast.success("Customer updated successfully");
       } else {
@@ -400,6 +341,7 @@ export default function Dashboard() {
             name: formData.name,
             email: formData.email,
             last_visit_date: formData.date,
+            service_tag: formData.service || null,
           })
           .select()
           .single();
@@ -415,7 +357,7 @@ export default function Dashboard() {
     }
   };
 
-  // --- CSV ACTIONS ---
+  // --- CSV ACTIONS (Legacy - keeping for drag-drop zone) ---
   const handleFileUpload = (file: File) => {
     if (!file) return;
     setUploading(true);
@@ -505,8 +447,8 @@ export default function Dashboard() {
                 onClick={() => setActiveTab("templates")}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === "templates" ? "bg-gray-800 text-white" : "text-gray-400 hover:text-white hover:bg-gray-900"}`}
               >
-                Templates
-              </button>{" "}
+                Programs
+              </button>
               <button
                 onClick={() => setActiveTab("settings")}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === "settings" ? "bg-gray-800 text-white" : "text-gray-400 hover:text-white hover:bg-gray-900"}`}
@@ -537,22 +479,11 @@ export default function Dashboard() {
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
                 <p className="text-gray-400 mt-1">
-                  Manage your client list and track retention.
+                  Manage your client list and track retention programs.
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="h-9 px-4 rounded-md border border-gray-800 text-sm font-medium hover:bg-gray-900 transition-colors flex items-center gap-2 disabled:opacity-50"
-                >
-                  {uploading ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <UploadCloud size={16} />
-                  )}
-                  <span>Import CSV</span>
-                </button>
+                <CSVUploadWithMapping onSuccess={fetchCustomers} />
                 <button
                   onClick={openAddModal}
                   className="h-9 px-4 rounded-md bg-white text-black text-sm font-medium hover:bg-gray-200 transition-colors flex items-center gap-2"
@@ -638,7 +569,7 @@ export default function Dashboard() {
                     </thead>
                     <tbody className="divide-y divide-gray-800">
                       {filteredCustomers.map((customer) => (
-                        <CustomerRow
+                        <EnhancedCustomerRow
                           key={customer.id}
                           customer={customer}
                           onDelete={handleDeleteCustomer}
@@ -657,174 +588,9 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* --- VIEW: TEMPLATES --- */}
-        {activeTab === "templates" && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                  Email Templates
-                </h1>
-                <p className="text-gray-400 mt-1">
-                  Design the emails your customers will receive.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedTemplateType("review")}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${selectedTemplateType === "review" ? "bg-white text-black" : "bg-[#111] text-gray-400 hover:text-white"}`}
-                >
-                  Review Email
-                </button>
-                <button
-                  onClick={() => setSelectedTemplateType("retention")}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${selectedTemplateType === "retention" ? "bg-white text-black" : "bg-[#111] text-gray-400 hover:text-white"}`}
-                >
-                  Retention Email
-                </button>
-              </div>
-            </div>
+        {/* --- TEMPLATES VIEW (NEW COMPONENT) --- */}
+        {activeTab === "templates" && <TemplatesTab />}
 
-            <div className="grid lg:grid-cols-2 gap-8 h-[600px]">
-              {/* EDITOR COLUMN */}
-              <div className="flex flex-col gap-4">
-                <div className="bg-[#0A0A0A] border border-gray-800 rounded-xl p-6 flex-1 flex flex-col gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs uppercase font-bold text-gray-500">
-                      Email Subject
-                    </label>
-                    <input
-                      type="text"
-                      value={templateData.subject}
-                      onChange={(e) =>
-                        setTemplateData({
-                          ...templateData,
-                          subject: e.target.value,
-                        })
-                      }
-                      className="w-full bg-[#111] border border-gray-800 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-white"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs uppercase font-bold text-gray-500">
-                      Heading
-                    </label>
-                    <input
-                      type="text"
-                      value={templateData.heading}
-                      onChange={(e) =>
-                        setTemplateData({
-                          ...templateData,
-                          heading: e.target.value,
-                        })
-                      }
-                      className="w-full bg-[#111] border border-gray-800 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-white"
-                    />
-                    <p className="text-[10px] text-gray-500">
-                      Tip: Use {"{{name}}"} to insert customer name.
-                    </p>
-                  </div>
-
-                  <div className="space-y-1 flex-1 flex flex-col">
-                    <label className="text-xs uppercase font-bold text-gray-500">
-                      Body Content
-                    </label>
-                    <textarea
-                      value={templateData.body}
-                      onChange={(e) =>
-                        setTemplateData({
-                          ...templateData,
-                          body: e.target.value,
-                        })
-                      }
-                      className="w-full flex-1 bg-[#111] border border-gray-800 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-white resize-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs uppercase font-bold text-gray-500">
-                      Button Text
-                    </label>
-                    <input
-                      type="text"
-                      value={templateData.button_text}
-                      onChange={(e) =>
-                        setTemplateData({
-                          ...templateData,
-                          button_text: e.target.value,
-                        })
-                      }
-                      className="w-full bg-[#111] border border-gray-800 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-white"
-                    />
-                  </div>
-
-                  <div className="pt-2">
-                    <button
-                      onClick={handleSaveTemplate}
-                      disabled={isSavingTemplate}
-                      className="w-full py-2 bg-white text-black font-semibold rounded-md hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-                    >
-                      {isSavingTemplate ? (
-                        <Loader2 className="animate-spin" size={16} />
-                      ) : (
-                        <Save size={16} />
-                      )}
-                      Save Template
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* PREVIEW COLUMN */}
-              <div className="bg-gray-900 rounded-xl border border-gray-800 p-8 flex items-center justify-center relative overflow-hidden">
-                <div className="absolute top-4 right-4 text-xs text-gray-500 font-mono flex items-center gap-2">
-                  <Eye size={12} /> LIVE PREVIEW
-                </div>
-
-                {/* Email Canvas */}
-                <div className="bg-white text-black w-full max-w-sm rounded-lg shadow-2xl overflow-hidden">
-                  {/* Fake Email Header */}
-                  <div className="bg-gray-100 p-4 border-b border-gray-200 text-xs text-gray-500">
-                    <div className="flex justify-between mb-1">
-                      <span>From:</span>{" "}
-                      <span className="text-gray-900 font-medium">
-                        Your Business
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Subject:</span>{" "}
-                      <span className="text-gray-900 font-medium">
-                        {templateData.subject.replace("{{name}}", "John")}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Body */}
-                  <div className="p-8 text-center space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-900">
-                      {templateData.heading.replace("{{name}}", "John")}
-                    </h2>
-
-                    <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
-                      {templateData.body.replace("{{name}}", "John")}
-                    </p>
-
-                    <div>
-                      <button className="bg-black text-white font-bold py-3 px-6 rounded-md shadow-lg transform active:scale-95 transition-transform">
-                        {templateData.button_text}
-                      </button>
-                    </div>
-
-                    <p className="text-xs text-gray-400 mt-8 pt-8 border-t border-gray-100">
-                      If you have issues, reply to this email.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         {/* --- SETTINGS VIEW --- */}
         {activeTab === "settings" && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -1086,6 +852,24 @@ export default function Dashboard() {
                   className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white focus:outline-none focus:ring-1 focus:ring-white transition-all [color-scheme:dark]"
                 />
               </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-500 uppercase">
+                  Service / Treatment
+                  <span className="text-gray-600 ml-1">(Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.service}
+                  onChange={(e) =>
+                    setFormData({ ...formData, service: e.target.value })
+                  }
+                  className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white transition-all"
+                  placeholder="e.g. acido_hialuronico"
+                />
+                <p className="text-xs text-gray-600">
+                  For retention programs - must match program tags
+                </p>
+              </div>
               <div className="pt-2 flex gap-3">
                 <button
                   type="button"
@@ -1166,9 +950,10 @@ export default function Dashboard() {
   );
 }
 
-// --- SUB-COMPONENTS ---
-
-function CustomerRow({
+// ========================================
+// ENHANCED CUSTOMER ROW COMPONENT
+// ========================================
+function EnhancedCustomerRow({
   customer,
   onDelete,
   onUpdate,
@@ -1181,10 +966,13 @@ function CustomerRow({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [programStatus, setProgramStatus] = useState<ProgramStatus | null>(
+    null,
+  );
+  const [loadingStatus, setLoadingStatus] = useState(false);
 
   const handleSendEmail = async () => {
     setSending(true);
-    // Call Server Action
     const result = await sendReviewEmail(customer.id, customer.email);
     setSending(false);
     setIsOpen(false);
@@ -1198,34 +986,127 @@ function CustomerRow({
     }
   };
 
+  const loadProgramStatus = async () => {
+    if (programStatus) return; // Already loaded
+    setLoadingStatus(true);
+    try {
+      const status = await getCustomerProgramStatus(customer.id);
+      setProgramStatus(status);
+    } catch (error) {
+      console.error("Error loading program status:", error);
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
+
+  const handleRowClick = () => {
+    if (!programStatus && customer.service_tag) {
+      loadProgramStatus();
+    }
+  };
+
   return (
-    <tr className="group hover:bg-[#111] transition-colors relative">
+    <tr
+      className="group hover:bg-[#111] transition-colors relative cursor-pointer"
+      onClick={handleRowClick}
+    >
       <td className="px-6 py-4">
         <div className="font-medium text-white">{customer.name}</div>
         <div className="text-gray-500 text-xs">{customer.email}</div>
+
+        {/* Service Tag Display */}
+        {customer.service_tag && (
+          <div className="mt-1 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 text-xs">
+              <Tag size={10} />
+              {customer.service_tag}
+            </span>
+          </div>
+        )}
+
+        {/* Program Status (appears after click/load) */}
+        {loadingStatus && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+            <Loader2 size={12} className="animate-spin" />
+            Loading program...
+          </div>
+        )}
+
+        {programStatus && programStatus.hasProgram && (
+          <div className="mt-2 space-y-1">
+            <div className="flex items-center gap-2 text-xs">
+              <Zap size={12} className="text-blue-400" />
+              <span className="text-blue-400 font-medium">
+                {programStatus.programName}
+              </span>
+              <span className="text-gray-600">
+                ({programStatus.totalSteps} email
+                {programStatus.totalSteps !== 1 ? "s" : ""})
+              </span>
+            </div>
+
+            {programStatus.nextEmailDays !== null ? (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Clock size={12} />
+                Next email in {programStatus.nextEmailDays} days
+              </div>
+            ) : (
+              <div className="text-xs text-gray-600">All emails sent</div>
+            )}
+
+            {programStatus.daysSinceVisit !== null && (
+              <div className="text-xs text-gray-600">
+                {programStatus.daysSinceVisit} days since last visit
+              </div>
+            )}
+          </div>
+        )}
+
+        {programStatus && !programStatus.hasProgram && customer.service_tag && (
+          <div className="mt-2 flex items-center gap-1 text-xs text-amber-500">
+            <Calendar size={12} />
+            No program for this service
+          </div>
+        )}
       </td>
+
       <td className="px-6 py-4 text-gray-400">
         {new Date(customer.last_visit_date).toLocaleDateString()}
       </td>
+
       <td className="px-6 py-4">{getStatusBadge(customer)}</td>
+
       <td className="px-6 py-4 text-right relative">
         <button
-          onClick={() => setIsOpen(!isOpen)}
-          className={`p-1 rounded-md transition-colors ${isOpen ? "text-white bg-gray-800" : "text-gray-500 hover:text-white hover:bg-gray-900"}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
+          className={`p-1 rounded-md transition-colors ${
+            isOpen
+              ? "text-white bg-gray-800"
+              : "text-gray-500 hover:text-white hover:bg-gray-900"
+          }`}
         >
           <MoreHorizontal size={16} />
         </button>
+
         {isOpen && (
           <div
             className="fixed inset-0 z-10 cursor-default"
-            onClick={() => setIsOpen(false)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(false);
+            }}
           />
         )}
+
         {isOpen && (
           <div className="absolute right-8 top-8 z-20 w-48 rounded-lg border border-gray-800 bg-[#0A0A0A] shadow-xl animate-in fade-in zoom-in-95 duration-100 overflow-hidden">
             <div className="p-1 flex flex-col gap-0.5">
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setIsOpen(false);
                   onEdit();
                 }}
@@ -1234,7 +1115,10 @@ function CustomerRow({
                 <Pencil size={14} /> <span>Edit Details</span>
               </button>
               <button
-                onClick={handleSendEmail}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSendEmail();
+                }}
                 disabled={sending}
                 className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-[#1A1A1A] rounded-md transition-colors text-left"
               >
@@ -1247,7 +1131,8 @@ function CustomerRow({
               </button>
               <div className="h-px bg-gray-800 my-1 mx-1" />
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setIsOpen(false);
                   onDelete(customer.id, customer.name);
                 }}
