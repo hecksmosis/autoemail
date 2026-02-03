@@ -23,6 +23,7 @@ export async function GET(request: Request) {
   const results = { processed: 0, sent: 0, errors: 0 };
 
   try {
+    // Fetch customers
     const { data: customers, error } = await supabase
       .from("customers")
       .select(
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
 
     for (const customer of customers || []) {
       const tenant = customer.tenants as any;
+      console.log(tenant);
       if (!tenant) continue;
 
       results.processed++;
@@ -85,6 +87,7 @@ export async function GET(request: Request) {
         }
       }
 
+      // EXECUTE SEND
       if (emailToSend) {
         const { template, type, dest } = emailToSend;
 
@@ -93,7 +96,7 @@ export async function GET(request: Request) {
           .from("email_logs")
           .select("*", { count: "exact", head: true })
           .eq("customer_id", customer.id)
-          .gte("created_at", new Date().toISOString().split("T")[0]);
+          .gte("sent_at", new Date().toISOString().split("T")[0]);
         if (count && count > 0) continue;
 
         const compiled = compileTemplate(template, {
@@ -101,12 +104,11 @@ export async function GET(request: Request) {
           business_name: tenant.business_name || "Us",
         });
 
-        // Generate Token (If template has custom URL, encode it)
-        const payload: any = { cid: customer.id };
-        if (template.button_url) payload.url = template.button_url; // Encode URL in token
+        // Generate Token
+        const payload: any = { cid: customer.id, type: type };
+        if (template.button_url) payload.url = template.button_url;
 
         const token = jwt.sign(payload, SECRET, { expiresIn: "30d" });
-        // If custom url exists, use 'custom' dest, otherwise fallback to default logic
         const finalDest = template.button_url ? "custom" : dest;
         const magicLink = `${BASE_URL}/api/track/click?token=${token}&dest=${finalDest}`;
 
@@ -126,6 +128,7 @@ export async function GET(request: Request) {
             subject: compiled.subject,
             html,
           });
+
           await supabase
             .from("customers")
             .update({
@@ -133,15 +136,27 @@ export async function GET(request: Request) {
               last_contacted_at: new Date().toISOString(),
             })
             .eq("id", customer.id);
+
+          // LOG WITH TENANT ID
           await supabase.from("email_logs").insert({
             customer_id: customer.id,
+            tenant_id: tenant.id, // <--- ADDED THIS
             email_type: type,
             status: "sent",
             metadata: { step_day: daysSinceVisit },
           });
+
           results.sent++;
-        } catch (e) {
+        } catch (e: any) {
           results.errors++;
+          // LOG ERROR
+          await supabase.from("email_logs").insert({
+            customer_id: customer.id,
+            tenant_id: tenant.id,
+            email_type: type,
+            status: "failed",
+            error_message: e.message,
+          });
         }
       }
     }

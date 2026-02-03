@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { decrypt, encrypt } from "./crypto";
-import { createClient } from "./supabase/server"; // Your server client helper
+import { createAdminClient } from "./supabase/admin"; // Your server client helper
 
 export const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -47,7 +47,7 @@ export function makeBody(
 
 // THE CORE SENDER FUNCTION
 export async function sendGmail({ tenantId, to, subject, html }: any) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // 1. Get Tenant Tokens
   const { data: tenant } = await supabase

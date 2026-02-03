@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { LogOut, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 // Import Modular Tabs
 import CustomersTab from "./customers-tab";
 import TemplatesTab from "./templates-tab";
 import SettingsTab from "./settings-tab";
+import AnalyticsTab from "./analytics-tab";
 
 type Customer = {
   id: string;
@@ -33,17 +33,12 @@ export default function Dashboard() {
 
   // Data State
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [settings, setSettings] = useState({
-    reviewLink: "",
-    replyToEmail: "",
-    retentionLink: "",
-    googleEmail: null as string | null,
-  });
+  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<
-    "customers" | "templates" | "settings"
-  >("customers");
+    "analytics" | "customers" | "templates" | "settings"
+  >("analytics");
 
   // Fetch Data Logic
   const fetchCustomers = async () => {
@@ -70,20 +65,13 @@ export default function Dashboard() {
       // 2. Check Tenant
       const { data: tenant } = await supabase
         .from("tenants")
-        .select(
-          "id, google_review_link, email_reply_to, retention_link, google_email_address",
-        )
+        .select("id, google_email_address") // Removed google_maps_link
         .eq("user_id", user.id)
         .single();
 
       if (tenant) {
         setTenantId(tenant.id);
-        setSettings({
-          reviewLink: tenant.google_review_link || "",
-          replyToEmail: tenant.email_reply_to || "",
-          retentionLink: tenant.retention_link || "",
-          googleEmail: tenant.google_email_address || null,
-        });
+        setGoogleEmail(tenant.google_email_address || null);
 
         // 3. Load Customers
         const { data: customerData } = await supabase
@@ -127,6 +115,11 @@ export default function Dashboard() {
             </span>
             <div className="hidden md:flex items-center gap-1">
               <NavButton
+                label="Analytics"
+                isActive={activeTab === "analytics"}
+                onClick={() => setActiveTab("analytics")}
+              />
+              <NavButton
                 label="Customers"
                 isActive={activeTab === "customers"}
                 onClick={() => setActiveTab("customers")}
@@ -159,6 +152,10 @@ export default function Dashboard() {
 
       {/* MAIN CONTENT AREA */}
       <main className="max-w-6xl mx-auto px-6 py-12">
+        {activeTab === "analytics" && tenantId && (
+          <AnalyticsTab tenantId={tenantId} />
+        )}
+
         {activeTab === "customers" && tenantId && (
           <CustomersTab
             initialCustomers={customers}
@@ -170,7 +167,7 @@ export default function Dashboard() {
         {activeTab === "templates" && <TemplatesTab />}
 
         {activeTab === "settings" && tenantId && (
-          <SettingsTab tenantId={tenantId} initialSettings={settings} />
+          <SettingsTab tenantId={tenantId} initialData={{ googleEmail }} />
         )}
       </main>
     </div>

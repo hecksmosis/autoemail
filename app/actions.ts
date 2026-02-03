@@ -3,8 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import jwt from "jsonwebtoken";
 import { revalidatePath } from "next/cache";
-import { sendGmail } from "@/lib/google"; // <--- NEW IMPORT
-import { getTemplate, compileTemplate } from "@/lib/templates"; // <--- NEW IMPORT
+import { sendGmail } from "@/lib/google";
+import { getTemplate, compileTemplate } from "@/lib/templates";
 
 const SECRET = process.env.TRACKING_JWT_SECRET!;
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -15,7 +15,7 @@ export async function sendReviewEmail(
 ) {
   const supabase = await createClient();
 
-  // 1. Fetch Customer & Tenant ID
+  // 1. Fetch Customer & Tenant Info
   const { data: customerData } = await supabase
     .from("customers")
     .select(`id, tenant_id, name, tenants(business_name)`)
@@ -28,22 +28,25 @@ export async function sendReviewEmail(
   const tenantName = (customerData.tenants as any)?.business_name;
   const customerName = customerData.name || "there";
 
-  // 2. FETCH TEMPLATE FROM DB
+  // 2. Fetch Template (Manual send always uses 'review' type)
   const rawTemplate = await getTemplate(supabase, tenantId, "review");
 
-  // 3. COMPILE VARIABLES
+  // 3. Compile Variables
   const template = compileTemplate(rawTemplate, {
     name: customerName,
     business_name: tenantName,
   });
 
   // 4. Generate Link
-  const token = jwt.sign(
-    { cid: customerId, url: template.button_url },
-    SECRET,
-    { expiresIn: "7d" },
-  );
-  const magicLink = `${BASE_URL}/api/track/click?token=${token}&url=custom`;
+  // Check if template has a custom button URL
+  const payload: any = { cid: customerId, type: "review" };
+  if (rawTemplate.button_url) payload.url = rawTemplate.button_url;
+
+  const token = jwt.sign(payload, SECRET, { expiresIn: "30d" });
+
+  // Determine destination type for tracking
+  const dest = rawTemplate.button_url ? "custom" : "google";
+  const magicLink = `${BASE_URL}/api/track/click?token=${token}&dest=${dest}`;
 
   // 5. Construct Final HTML
   const htmlContent = `
@@ -63,7 +66,7 @@ export async function sendReviewEmail(
     </div>
   `;
 
-  // 6. Send
+  // 6. Send & Log
   try {
     await sendGmail({
       tenantId: tenantId,
@@ -72,7 +75,7 @@ export async function sendReviewEmail(
       html: htmlContent,
     });
 
-    // 7. Update DB
+    // 7. Update Customer Status
     await supabase
       .from("customers")
       .update({
@@ -81,10 +84,28 @@ export async function sendReviewEmail(
       })
       .eq("id", customerId);
 
+    // 8. LOG SUCCESS
+    await supabase.from("email_logs").insert({
+      customer_id: customerId,
+      tenant_id: tenantId,
+      email_type: "review",
+      status: "sent",
+    });
+
     revalidatePath("/dashboard");
     return { success: true };
   } catch (error: any) {
     console.error("Google Send Error:", error);
+
+    // 9. LOG FAILURE
+    await supabase.from("email_logs").insert({
+      customer_id: customerId,
+      tenant_id: tenantId,
+      email_type: "review",
+      status: "failed",
+      error_message: error.message,
+    });
+
     return { success: false, error: "Failed to send: " + error.message };
   }
 }

@@ -1,17 +1,13 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Loader2,
-  Mail,
-  Link as LinkIcon,
-  Calendar,
   ShieldCheck,
   CheckCircle2,
   Unplug,
   AlertCircle,
-  Settings,
   FileSpreadsheet,
   Download,
 } from "lucide-react";
@@ -19,53 +15,21 @@ import { toast } from "sonner";
 
 interface SettingsTabProps {
   tenantId: string;
-  initialSettings: {
-    reviewLink: string;
-    replyToEmail: string;
-    retentionLink: string;
+  initialData: {
     googleEmail: string | null;
   };
 }
 
 export default function SettingsTab({
   tenantId,
-  initialSettings,
+  initialData,
 }: SettingsTabProps) {
   const supabase = createClient();
-  const [reviewLink, setReviewLink] = useState(initialSettings.reviewLink);
-  const [replyToEmail, setReplyToEmail] = useState(
-    initialSettings.replyToEmail,
-  );
-  const [retentionLink, setRetentionLink] = useState(
-    initialSettings.retentionLink,
-  );
   const [googleEmail, setGoogleEmail] = useState<string | null>(
-    initialSettings.googleEmail,
+    initialData.googleEmail,
   );
 
-  const [savingSettings, setSavingSettings] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-
-  const handleSaveSettings = async (e: FormEvent) => {
-    e.preventDefault();
-    setSavingSettings(true);
-
-    const { error } = await supabase
-      .from("tenants")
-      .update({
-        google_review_link: reviewLink,
-        email_reply_to: replyToEmail,
-        retention_link: retentionLink,
-      })
-      .eq("id", tenantId);
-
-    setSavingSettings(false);
-    if (error) {
-      toast.error("Error saving settings");
-    } else {
-      toast.success("Settings saved successfully");
-    }
-  };
 
   const handleDisconnectGoogle = async () => {
     if (!confirm("Are you sure? This will stop all email automation.")) return;
@@ -97,7 +61,7 @@ export default function SettingsTab({
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           <p className="text-gray-400 mt-1">
-            Configure your integration and notification preferences.
+            Manage your email connection and data sources.
           </p>
         </div>
       </div>
@@ -156,68 +120,6 @@ export default function SettingsTab({
             </div>
           )}
         </div>
-      </div>
-
-      {/* CONFIG CARD */}
-      <div className="rounded-xl border border-gray-800 bg-[#0A0A0A] overflow-hidden">
-        <div className="p-6 border-b border-gray-800">
-          <h2 className="text-lg font-medium text-white flex items-center gap-2">
-            <Settings size={20} className="text-gray-400" />
-            Links & Configuration
-          </h2>
-        </div>
-
-        <form onSubmit={handleSaveSettings} className="p-6 space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
-              <Mail size={16} /> Reply-To Email
-            </label>
-            <input
-              type="email"
-              value={replyToEmail}
-              onChange={(e) => setReplyToEmail(e.target.value)}
-              className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white focus:outline-none focus:ring-1 focus:ring-white"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
-              <LinkIcon size={16} /> Google Reviews Link
-            </label>
-            <input
-              type="url"
-              value={reviewLink}
-              onChange={(e) => setReviewLink(e.target.value)}
-              className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white focus:outline-none focus:ring-1 focus:ring-white"
-            />
-          </div>
-
-          <div className="space-y-2 pt-4 border-t border-gray-800">
-            <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
-              <Calendar size={16} /> Booking / Retention Link
-            </label>
-            <input
-              type="url"
-              value={retentionLink}
-              onChange={(e) => setRetentionLink(e.target.value)}
-              className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white focus:outline-none focus:ring-1 focus:ring-white"
-            />
-          </div>
-
-          <div className="flex justify-end pt-4">
-            <button
-              type="submit"
-              disabled={savingSettings}
-              className="h-10 px-4 rounded-md bg-white text-black text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {savingSettings ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                "Save Changes"
-              )}
-            </button>
-          </div>
-        </form>
       </div>
 
       {/* EXCEL SYNC */}

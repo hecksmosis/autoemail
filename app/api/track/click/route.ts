@@ -14,12 +14,18 @@ export async function GET(request: Request) {
   if (!token) return new NextResponse("Missing Token", { status: 400 });
 
   let customerId: string;
+  let emailType: string;
   let customUrl: string | undefined;
 
   try {
-    const decoded = jwt.verify(token, SECRET) as { cid: string; url?: string };
+    const decoded = jwt.verify(token, SECRET) as {
+      type: string;
+      cid: string;
+      url?: string;
+    };
     customerId = decoded.cid;
     customUrl = decoded.url; // Get custom URL if present
+    emailType = decoded.type;
   } catch (err) {
     return new NextResponse("Invalid Link", { status: 403 });
   }
@@ -36,7 +42,8 @@ export async function GET(request: Request) {
 
     await supabaseAdmin.from("email_logs").insert({
       customer_id: customerId,
-      email_type: "click",
+      tenant_id: customer.tenant_id,
+      email_type: emailType,
       status: "clicked",
     });
     if (customer.status !== "reviewed") {
