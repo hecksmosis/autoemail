@@ -38,7 +38,7 @@ export default function Dashboard() {
   // Active Tab
   const [activeTab, setActiveTab] = useState<
     "analytics" | "customers" | "templates" | "settings"
-  >("analytics");
+  >("customers");
 
   // Fetch Data Logic
   const fetchCustomers = async () => {
@@ -115,11 +115,6 @@ export default function Dashboard() {
             </span>
             <div className="hidden md:flex items-center gap-1">
               <NavButton
-                label="Analytics"
-                isActive={activeTab === "analytics"}
-                onClick={() => setActiveTab("analytics")}
-              />
-              <NavButton
                 label="Customers"
                 isActive={activeTab === "customers"}
                 onClick={() => setActiveTab("customers")}
@@ -128,6 +123,11 @@ export default function Dashboard() {
                 label="Programs"
                 isActive={activeTab === "templates"}
                 onClick={() => setActiveTab("templates")}
+              />
+              <NavButton
+                label="Analytics"
+                isActive={activeTab === "analytics"}
+                onClick={() => setActiveTab("analytics")}
               />
               <NavButton
                 label="Settings"

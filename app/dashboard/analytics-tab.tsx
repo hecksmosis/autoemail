@@ -210,7 +210,10 @@ export default function AnalyticsTab({ tenantId }: { tenantId: string }) {
                     borderColor: "#333",
                     color: "#fff",
                   }}
-                  formatter={(value: number) => [value, "Est. Reviews"]}
+                  formatter={(value: number | undefined) => [
+                    value,
+                    "Est. Reviews",
+                  ]}
                 />
                 <Area
                   type="monotone"
