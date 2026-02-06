@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Plus,
   Trash2,
@@ -17,6 +17,7 @@ import {
   Zap,
   Eye,
   Link as LinkIcon,
+  CircleHelp,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -84,7 +85,7 @@ export default function TemplatesTab() {
       programCache = programsData;
       tagsCache = tagsData;
     } catch (error: any) {
-      toast.error("Error loading programs: " + error.message);
+      toast.error("Error cargando programas: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -102,17 +103,17 @@ export default function TemplatesTab() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Retention Programs
+            Programas de Retención
           </h1>
           <p className="text-gray-400 mt-1">
-            Create automated email sequences based on services.
+            Crea secuencias de correo automatizadas basadas en servicios.
           </p>
         </div>
         <button
           onClick={() => setCreateProgramModal(true)}
           className="h-9 px-4 rounded-md bg-white text-black text-sm font-medium hover:bg-gray-200 transition-colors flex items-center gap-2"
         >
-          <Plus size={16} /> <span>New Program</span>
+          <Plus size={16} /> <span>Nuevo Programa</span>
         </button>
       </div>
 
@@ -121,13 +122,13 @@ export default function TemplatesTab() {
           onClick={() => setMode("simple")}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${mode === "simple" ? "bg-white text-black" : "bg-[#111] text-gray-400 hover:text-white"}`}
         >
-          Simple Templates
+          Plantillas Simples
         </button>
         <button
           onClick={() => setMode("programs")}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${mode === "programs" ? "bg-white text-black" : "bg-[#111] text-gray-400 hover:text-white"}`}
         >
-          Advanced Programs
+          Programas Avanzados
         </button>
       </div>
 
@@ -139,17 +140,19 @@ export default function TemplatesTab() {
             <ProgramsView
               programs={programs}
               onRefresh={loadData}
-              onCreateStep={(programId: any) =>
+              onCreateStep={(programId: string) =>
                 setCreateStepModal({ open: true, programId })
               }
-              onPreviewStep={(step: any) => setSelectedPreviewStep(step)}
+              onPreviewStep={(step: ProgramStep) =>
+                setSelectedPreviewStep(step)
+              }
             />
           </div>
           <div className="lg:col-span-1 sticky top-6">
             <div className="bg-[#0A0A0A] border border-gray-800 rounded-xl overflow-hidden min-h-[400px] flex flex-col">
               <div className="p-4 border-b border-gray-800 bg-gray-900/30 flex items-center justify-between">
                 <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Email Preview
+                  Vista Previa
                 </span>
                 {selectedPreviewStep && (
                   <button
@@ -165,9 +168,12 @@ export default function TemplatesTab() {
                   <div className="w-full bg-white rounded-lg shadow-xl overflow-hidden text-black animate-in zoom-in-95 duration-200">
                     <div className="bg-gray-100 p-3 border-b border-gray-200 text-[10px] text-gray-500">
                       <div className="flex justify-between mb-1">
-                        <span>Subject:</span>{" "}
+                        <span>Asunto:</span>{" "}
                         <span className="text-gray-900 font-medium truncate ml-2">
-                          {selectedPreviewStep.template?.subject}
+                          {selectedPreviewStep.template?.subject.replace(
+                            "{{name}}",
+                            "Juan",
+                          )}
                         </span>
                       </div>
                     </div>
@@ -175,11 +181,14 @@ export default function TemplatesTab() {
                       <h2 className="text-xl font-bold text-gray-900">
                         {selectedPreviewStep.template?.heading.replace(
                           "{{name}}",
-                          "John",
+                          "Juan",
                         )}
                       </h2>
                       <p className="text-gray-600 text-sm whitespace-pre-wrap leading-relaxed">
-                        {selectedPreviewStep.template?.body}
+                        {selectedPreviewStep.template?.body.replace(
+                          "{{name}}",
+                          "Juan",
+                        )}
                       </p>
                       <button className="bg-black text-white font-bold py-2 px-4 rounded text-sm mt-2">
                         {selectedPreviewStep.template?.button_text}
@@ -187,14 +196,15 @@ export default function TemplatesTab() {
                     </div>
                   </div>
                   <p className="text-gray-500 text-xs mt-4">
-                    Scheduled for Day {selectedPreviewStep.offset_days}
+                    Programado para el Día {selectedPreviewStep.offset_days}
                   </p>
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-8 text-center">
                   <Eye className="h-10 w-10 mb-2 opacity-50" />
                   <p className="text-sm">
-                    Click the eye icon on any email step to preview it here.
+                    Haz clic en el icono del ojo en cualquier paso para
+                    previsualizar.
                   </p>
                 </div>
               )}
@@ -258,7 +268,7 @@ function ProgramsView({
       <div className="bg-[#0A0A0A] border border-gray-800 rounded-xl p-12 text-center">
         <Zap className="h-12 w-12 mx-auto mb-4 text-gray-600" />
         <h3 className="text-lg font-medium text-white mb-2">
-          No Programs Created Yet
+          No hay programas creados aún
         </h3>
       </div>
     );
@@ -299,7 +309,7 @@ function ProgramCard({
   const handleSaveName = async () => {
     try {
       await updateRetentionProgram(program.id, { display_name: displayName });
-      toast.success("Updated");
+      toast.success("Actualizado");
       onRefresh();
       setIsEditing(false);
     } catch (e: any) {
@@ -309,16 +319,16 @@ function ProgramCard({
   const handleToggleEnabled = async () => {
     try {
       await updateRetentionProgram(program.id, { enabled: !program.enabled });
-      toast.success("Updated");
+      toast.success("Actualizado");
       onRefresh();
     } catch (e: any) {
       toast.error(e.message);
     }
   };
   const handleDelete = async () => {
-    if (confirm("Delete program?")) {
+    if (confirm("¿Eliminar programa?")) {
       await deleteRetentionProgram(program.id);
-      toast.success("Deleted");
+      toast.success("Eliminado");
       onRefresh();
     }
   };
@@ -354,7 +364,7 @@ function ProgramCard({
                   <Tag size={12} /> {program.service_tag}
                 </span>
                 <span>•</span>
-                <span>{program.steps?.length || 0} steps</span>
+                <span>{program.steps?.length || 0} pasos</span>
               </div>
             </div>
           )}
@@ -434,7 +444,7 @@ function ProgramCard({
               ))
             ) : (
               <div className="py-2 text-gray-600 text-sm italic pl-2">
-                No steps yet. Click + to add one.
+                No hay pasos. Clic en + para añadir uno.
               </div>
             )}
             <div className="relative">
@@ -443,7 +453,7 @@ function ProgramCard({
                 onClick={onCreateStep}
                 className="w-full h-10 border border-dashed border-gray-800 rounded-md text-sm text-gray-500 hover:text-white hover:border-gray-600 transition-colors flex items-center justify-center gap-2"
               >
-                <Plus size={16} /> Add Email Step
+                <Plus size={16} /> Añadir Paso de Email
               </button>
             </div>
           </div>
@@ -466,6 +476,11 @@ function StepCard({ step, stepNumber, programId, onRefresh, onPreview }: any) {
   const [buttonUrl, setButtonUrl] = useState(step.template?.button_url || "");
   const [enabled, setEnabled] = useState(step.enabled);
 
+  // Refs for cursor insertion
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const headingRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -480,7 +495,7 @@ function StepCard({ step, stepNumber, programId, onRefresh, onPreview }: any) {
           button_url: buttonUrl,
         },
       });
-      toast.success("Saved");
+      toast.success("Guardado");
       onRefresh();
       setIsEditing(false);
     } catch (e: any) {
@@ -491,11 +506,25 @@ function StepCard({ step, stepNumber, programId, onRefresh, onPreview }: any) {
   };
 
   const handleDelete = async () => {
-    if (confirm("Delete step?")) {
+    if (confirm("¿Eliminar paso?")) {
       await deleteProgramStep(step.id);
-      toast.success("Deleted");
+      toast.success("Eliminado");
       onRefresh();
     }
+  };
+
+  const insertPlaceholder = (setter: any, ref: any) => {
+    const el = ref.current;
+    if (!el) return;
+    const start = el.selectionStart || 0;
+    const end = el.selectionEnd || 0;
+    const text = el.value;
+    const newText = text.substring(0, start) + "{{name}}" + text.substring(end);
+    setter(newText);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + 8, start + 8);
+    }, 0);
   };
 
   if (isEditing) {
@@ -503,7 +532,7 @@ function StepCard({ step, stepNumber, programId, onRefresh, onPreview }: any) {
       <div className="relative bg-[#111] border border-blue-900/50 rounded-lg p-4 shadow-xl z-20">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-sm font-medium text-blue-400">
-            Editing Step {stepNumber}
+            Editando Paso {stepNumber}
           </h4>
           <button
             onClick={() => setIsEditing(false)}
@@ -516,7 +545,7 @@ function StepCard({ step, stepNumber, programId, onRefresh, onPreview }: any) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gray-500 font-bold block mb-1">
-                Send on Day
+                Enviar el Día
               </label>
               <input
                 type="number"
@@ -528,56 +557,72 @@ function StepCard({ step, stepNumber, programId, onRefresh, onPreview }: any) {
             </div>
             <div>
               <label className="text-xs text-gray-500 font-bold block mb-1">
-                Status
+                Estado
               </label>
               <select
                 value={enabled ? "true" : "false"}
                 onChange={(e) => setEnabled(e.target.value === "true")}
                 className="w-full h-9 px-3 rounded-md bg-[#1a1a1a] border border-gray-800 text-white text-sm"
               >
-                <option value="true">Active</option>
-                <option value="false">Disabled</option>
+                <option value="true">Activo</option>
+                <option value="false">Desactivado</option>
               </select>
             </div>
           </div>
           <hr className="border-gray-800" />
+
           <div>
             <label className="text-xs text-gray-500 font-bold block mb-1">
-              Subject
+              Asunto
             </label>
             <input
+              ref={subjectRef}
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full h-9 px-3 rounded-md bg-[#1a1a1a] border border-gray-800 text-white text-sm"
+              className="w-full h-10 px-3 rounded-md bg-[#1a1a1a] border border-gray-800 text-white text-lg font-medium"
+            />
+            <NamePlaceholderControl
+              onInsert={() => insertPlaceholder(setSubject, subjectRef)}
             />
           </div>
+
           <div>
             <label className="text-xs text-gray-500 font-bold block mb-1">
-              Heading
+              Encabezado
             </label>
             <input
+              ref={headingRef}
               type="text"
               value={heading}
               onChange={(e) => setHeading(e.target.value)}
               className="w-full h-9 px-3 rounded-md bg-[#1a1a1a] border border-gray-800 text-white text-sm"
             />
+            <NamePlaceholderControl
+              onInsert={() => insertPlaceholder(setHeading, headingRef)}
+            />
           </div>
+
           <div>
             <label className="text-xs text-gray-500 font-bold block mb-1">
-              Body
+              Cuerpo
             </label>
             <textarea
+              ref={bodyRef}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={4}
               className="w-full p-3 rounded-md bg-[#1a1a1a] border border-gray-800 text-white text-sm resize-none"
             />
+            <NamePlaceholderControl
+              onInsert={() => insertPlaceholder(setBody, bodyRef)}
+            />
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gray-500 font-bold block mb-1">
-                Button Text
+                Texto Botón
               </label>
               <input
                 type="text"
@@ -588,13 +633,13 @@ function StepCard({ step, stepNumber, programId, onRefresh, onPreview }: any) {
             </div>
             <div>
               <label className="text-xs text-gray-500 font-bold block mb-1">
-                Button Link
+                Enlace
               </label>
               <input
                 type="url"
                 value={buttonUrl}
                 onChange={(e) => setButtonUrl(e.target.value)}
-                placeholder="Optional"
+                placeholder="https://..."
                 className="w-full h-9 px-3 rounded-md bg-[#1a1a1a] border border-gray-800 text-white text-sm"
               />
             </div>
@@ -603,7 +648,7 @@ function StepCard({ step, stepNumber, programId, onRefresh, onPreview }: any) {
             onClick={handleSave}
             className="w-full h-9 rounded-md bg-white text-black text-sm font-medium mt-2"
           >
-            Save Changes
+            Guardar Cambios
           </button>
         </div>
       </div>
@@ -617,23 +662,23 @@ function StepCard({ step, stepNumber, programId, onRefresh, onPreview }: any) {
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onPreview}>
           <div className="flex items-center gap-3 mb-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#151515] border border-gray-800 text-xs font-mono font-medium text-gray-300">
-              <Clock size={12} className="text-blue-500" /> DAY{" "}
+              <Clock size={12} className="text-blue-500" /> DÍA{" "}
               {step.offset_days}
             </span>
             {!step.enabled && (
               <span className="text-xs text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded">
-                DISABLED
+                DESACTIVADO
               </span>
             )}
             <span className="text-xs text-gray-600 font-mono">
-              STEP {stepNumber}
+              PASO {stepNumber}
             </span>
           </div>
           <h4 className="text-base font-semibold text-white mb-1 truncate group-hover:text-blue-400 transition-colors">
-            {step.template?.subject || "(No Subject)"}
+            {step.template?.subject || "(Sin Asunto)"}
           </h4>
           <p className="text-sm text-gray-400 line-clamp-2 leading-relaxed">
-            {step.template?.body || "(No Content)"}
+            {step.template?.body || "(Sin Contenido)"}
           </p>
         </div>
         <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -674,7 +719,7 @@ function CreateProgramModal({ serviceTags, onClose, onSuccess }: any) {
         service_tag: serviceTag,
         enabled: true,
       });
-      toast.success("Created");
+      toast.success("Creado");
       onSuccess();
     } catch (e: any) {
       toast.error(e.message);
@@ -685,13 +730,13 @@ function CreateProgramModal({ serviceTags, onClose, onSuccess }: any) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
       <div className="w-full max-w-lg bg-[#0A0A0A] border border-gray-800 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white mb-4">
-          Create Program
+          Crear Programa
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
             required
-            placeholder="Display Name (e.g. Botox Treatment)"
+            placeholder="Nombre Visible (ej. Tratamiento Botox)"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white"
@@ -699,7 +744,7 @@ function CreateProgramModal({ serviceTags, onClose, onSuccess }: any) {
           <div className="space-y-2">
             <div className="flex justify-between">
               <label className="text-xs text-gray-500 uppercase">
-                Service Tag
+                Etiqueta de Servicio
               </label>
               {serviceTags.length > 0 && (
                 <button
@@ -707,7 +752,7 @@ function CreateProgramModal({ serviceTags, onClose, onSuccess }: any) {
                   onClick={() => setUseExisting(!useExisting)}
                   className="text-xs text-blue-400"
                 >
-                  {useExisting ? "Create New" : "Use Existing"}
+                  {useExisting ? "Crear Nuevo" : "Usar Existente"}
                 </button>
               )}
             </div>
@@ -717,7 +762,7 @@ function CreateProgramModal({ serviceTags, onClose, onSuccess }: any) {
                 onChange={(e) => setServiceTag(e.target.value)}
                 className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white"
               >
-                <option value="">Select...</option>
+                <option value="">Seleccionar...</option>
                 {serviceTags.map((t: string) => (
                   <option key={t} value={t}>
                     {t}
@@ -728,7 +773,7 @@ function CreateProgramModal({ serviceTags, onClose, onSuccess }: any) {
               <input
                 type="text"
                 required
-                placeholder="Tag (e.g. botox)"
+                placeholder="Etiqueta (ej. botox)"
                 value={serviceTag}
                 onChange={(e) => setServiceTag(e.target.value)}
                 className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white"
@@ -741,13 +786,13 @@ function CreateProgramModal({ serviceTags, onClose, onSuccess }: any) {
               onClick={onClose}
               className="flex-1 h-10 border border-gray-800 rounded-md text-white"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
               className="flex-1 h-10 bg-white text-black rounded-md font-medium"
             >
-              Create
+              Crear
             </button>
           </div>
         </form>
@@ -765,10 +810,34 @@ function CreateStepModal({
   const [offsetDays, setOffsetDays] = useState(30);
   const [template, setTemplate] = useState({
     subject: "",
-    heading: "Hi {{name}},",
+    heading: "Hola {{name}},",
     body: "",
-    button_text: "Book Now",
+    button_text: "Reservar Cita",
+    button_url: "",
   });
+
+  // Refs for cursor insertion in Create Modal
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const headingRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertPlaceholder = (
+    field: "subject" | "heading" | "body",
+    ref: any,
+  ) => {
+    const el = ref.current;
+    if (!el) return;
+    const start = el.selectionStart || 0;
+    const end = el.selectionEnd || 0;
+    const text = el.value;
+    const newText = text.substring(0, start) + "{{name}}" + text.substring(end);
+    setTemplate((prev) => ({ ...prev, [field]: newText }));
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + 8, start + 8);
+    }, 0);
+  };
+
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     try {
@@ -778,7 +847,7 @@ function CreateStepModal({
         offset_days: offsetDays,
         template,
       });
-      toast.success("Added");
+      toast.success("Añadido");
       onSuccess();
     } catch (e: any) {
       toast.error(e.message);
@@ -788,12 +857,12 @@ function CreateStepModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200 overflow-y-auto">
       <div className="w-full max-w-lg bg-[#0A0A0A] border border-gray-800 rounded-xl p-6 my-8">
         <h2 className="text-lg font-semibold text-white mb-4">
-          Add Email Step
+          Añadir Paso de Email
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-xs text-gray-500 uppercase">
-              Days After Visit
+              Días después de visita
             </label>
             <input
               type="number"
@@ -804,21 +873,30 @@ function CreateStepModal({
               className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white"
             />
           </div>
+
           <div>
-            <label className="text-xs text-gray-500 uppercase">Subject</label>
+            <label className="text-xs text-gray-500 uppercase">Asunto</label>
             <input
+              ref={subjectRef}
               type="text"
               required
               value={template.subject}
               onChange={(e) =>
                 setTemplate({ ...template, subject: e.target.value })
               }
-              className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white"
+              className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white text-lg font-medium"
+            />
+            <NamePlaceholderControl
+              onInsert={() => insertPlaceholder("subject", subjectRef)}
             />
           </div>
+
           <div>
-            <label className="text-xs text-gray-500 uppercase">Heading</label>
+            <label className="text-xs text-gray-500 uppercase">
+              Encabezado
+            </label>
             <input
+              ref={headingRef}
               type="text"
               required
               value={template.heading}
@@ -827,10 +905,15 @@ function CreateStepModal({
               }
               className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white"
             />
+            <NamePlaceholderControl
+              onInsert={() => insertPlaceholder("heading", headingRef)}
+            />
           </div>
+
           <div>
-            <label className="text-xs text-gray-500 uppercase">Body</label>
+            <label className="text-xs text-gray-500 uppercase">Cuerpo</label>
             <textarea
+              ref={bodyRef}
               required
               value={template.body}
               onChange={(e) =>
@@ -839,35 +922,76 @@ function CreateStepModal({
               rows={4}
               className="w-full p-3 rounded-md bg-[#111] border border-gray-800 text-white resize-none"
             />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 uppercase">Button</label>
-            <input
-              type="text"
-              required
-              value={template.button_text}
-              onChange={(e) =>
-                setTemplate({ ...template, button_text: e.target.value })
-              }
-              className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white"
+            <NamePlaceholderControl
+              onInsert={() => insertPlaceholder("body", bodyRef)}
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 uppercase">Botón</label>
+              <input
+                type="text"
+                required
+                value={template.button_text}
+                onChange={(e) =>
+                  setTemplate({ ...template, button_text: e.target.value })
+                }
+                className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 uppercase">Enlace</label>
+              <input
+                type="url"
+                value={template.button_url}
+                onChange={(e) =>
+                  setTemplate({ ...template, button_url: e.target.value })
+                }
+                placeholder="https://..."
+                className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white"
+              />
+            </div>
+          </div>
+
           <div className="flex gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
               className="flex-1 h-10 border border-gray-800 rounded-md text-white"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
               className="flex-1 h-10 bg-white text-black rounded-md font-medium"
             >
-              Add Step
+              Añadir Paso
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function NamePlaceholderControl({ onInsert }: { onInsert: () => void }) {
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      <button
+        type="button"
+        onClick={onInsert}
+        className="text-[10px] bg-gray-800 hover:bg-gray-700 text-blue-400 px-2 py-0.5 rounded transition-colors border border-gray-700"
+      >
+        + Insertar Nombre
+      </button>
+      <div className="group relative flex items-center">
+        <CircleHelp size={14} className="text-gray-600 cursor-help" />
+        <div className="absolute left-6 top-1/2 -translate-y-1/2 w-48 p-2 bg-gray-900 border border-gray-700 rounded-md text-[10px] text-gray-300 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl">
+          El código <strong>{`{{name}}`}</strong> será reemplazado
+          automáticamente por el nombre real del cliente (ej. "Juan") al enviar
+          el correo.
+        </div>
       </div>
     </div>
   );

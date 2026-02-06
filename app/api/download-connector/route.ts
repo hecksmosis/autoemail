@@ -24,19 +24,16 @@ export async function GET(request: Request) {
   if (!tenant)
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
 
-  // 3. Generate a new Long-Lived API Key
-  // In a real app, you might want to reuse an existing key or allow key rotation.
-  // Here we generate a simple random key for the connector.
+  // 3. Generate a new API Key for this session
+  // In production, consider hashing this key before storing,
+  // but showing it once to the user in the config file.
   const apiKey = `sk_${Math.random().toString(36).substr(2)}${Date.now().toString(36)}`;
 
   // 4. Save Key to DB
-  // We use the Service Role (Admin) client implicitly via database policies or
-  // you might need `supabaseAdmin` if your RLS is strict on api_keys table.
-  // Assuming 'api_keys' table allows insert by authenticated users for their tenant:
   const { error: keyError } = await supabase.from("api_keys").insert({
     tenant_id: tenant.id,
-    key_hash: apiKey, // In prod, hash this!
-    label: "One-Click Connector",
+    key_hash: apiKey, // Warning: Storing raw key for MVP. Hash in prod.
+    label: "Desktop Connector",
   });
 
   if (keyError) {
@@ -47,35 +44,50 @@ export async function GET(request: Request) {
     );
   }
 
-  // 5. Read the Generic Binary
-  // Vercel/Next.js specific path resolution
+  // 5. Read the Go Binary
+  // Ensure you put the compiled 'GerpaTechConnector.exe' in your project's 'bin' folder
+  // and rename it to 'connector.exe' for simplicity, or adjust the name below.
   const binaryPath = path.join(process.cwd(), "bin", "connector.exe");
 
   let binaryData;
   try {
     binaryData = fs.readFileSync(binaryPath);
   } catch (e) {
+    console.error("Binary missing at:", binaryPath);
     return NextResponse.json(
-      { error: "Server misconfiguration: Binary not found" },
+      {
+        error: "Server misconfiguration: Connector binary not found on server.",
+      },
       { status: 500 },
     );
   }
 
-  // 6. Create the Config JSON
+  // 6. Create the Config JSON matching the Go App struct
   const configData = {
-    file_path: "C:\\Users\\User\\Desktop\\customers.xlsx", // Default placeholder
+    file_path: "", // User must select this in UI
     api_key: apiKey,
     api_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/sync/excel`,
-    sync_every_minutes: 60,
+    sync_interval: 60,
+    col_name: "A",
+    col_email: "B",
+    col_date: "C",
+    sheet_name: "Sheet1",
   };
 
   // 7. Create Zip
   const zip = new JSZip();
-  zip.file("connector.exe", binaryData);
+  zip.file("GerpaTechConnector.exe", binaryData);
   zip.file("config.json", JSON.stringify(configData, null, 2));
   zip.file(
     "README.txt",
-    "1. Place your Excel file path in config.json\n2. Run connector.exe",
+    `SETUP INSTRUCTIONS:
+1. Extract all files to a folder.
+2. Run GerpaTechConnector.exe.
+3. The app will open. The API Key and URL are pre-filled from config.json.
+4. Select your Excel file using the folder icon.
+5. Adjust column letters (A, B, C) if needed.
+6. Click "Save & Restart Sync".
+    `,
   );
 
   const content = await zip.generateAsync({ type: "nodebuffer" });
@@ -85,7 +97,7 @@ export async function GET(request: Request) {
     status: 200,
     headers: {
       "Content-Type": "application/zip",
-      "Content-Disposition": 'attachment; filename="saas-connector.zip"',
+      "Content-Disposition": 'attachment; filename="GerpaTech-Connector.zip"',
     },
   });
 }

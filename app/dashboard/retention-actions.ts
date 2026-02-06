@@ -27,6 +27,7 @@ export type ProgramStep = {
     heading: string;
     body: string;
     button_text: string;
+    button_url?: string; // Added
   };
 };
 
@@ -46,12 +47,12 @@ export type CreateStepInput = {
     heading: string;
     body: string;
     button_text: string;
+    button_url?: string; // Added
   };
 };
 
 export async function getRetentionPrograms() {
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -62,27 +63,18 @@ export async function getRetentionPrograms() {
     .select("id")
     .eq("user_id", user.id)
     .single();
-
   if (!tenant) throw new Error("Tenant not found");
 
-  // Get programs with their steps and templates
   const { data: programs, error } = await supabase
     .from("retention_programs")
     .select(
-      `
-      *,
-      steps:program_steps(
-        *,
-        template:email_templates(id, subject, heading, body, button_text)
-      )
-    `,
-    )
+      `*, steps:program_steps(*, template:email_templates(id, subject, heading, body, button_text, button_url))`,
+    ) // Added button_url
     .eq("tenant_id", tenant.id)
     .order("created_at", { ascending: true });
 
   if (error) throw error;
 
-  // Sort steps by step_order
   const programsWithSortedSteps = programs?.map((program) => ({
     ...program,
     steps:
@@ -95,7 +87,6 @@ export async function getRetentionPrograms() {
 
 export async function createRetentionProgram(input: CreateProgramInput) {
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -106,10 +97,8 @@ export async function createRetentionProgram(input: CreateProgramInput) {
     .select("id")
     .eq("user_id", user.id)
     .single();
-
   if (!tenant) throw new Error("Tenant not found");
 
-  // Normalize service_tag: lowercase, trim, replace spaces with underscores
   const normalizedTag = input.service_tag
     .toLowerCase()
     .trim()
@@ -128,12 +117,8 @@ export async function createRetentionProgram(input: CreateProgramInput) {
     .single();
 
   if (error) {
-    if (error.code === "23505") {
-      // Unique constraint violation
-      throw new Error(
-        "A program with this service tag already exists. Please use a different tag.",
-      );
-    }
+    if (error.code === "23505")
+      throw new Error("Ya existe un programa con esta etiqueta.");
     throw error;
   }
 
@@ -146,7 +131,6 @@ export async function updateRetentionProgram(
   updates: Partial<CreateProgramInput>,
 ) {
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -235,6 +219,7 @@ export async function createProgramStep(input: CreateStepInput) {
       heading: input.template.heading,
       body: input.template.body,
       button_text: input.template.button_text,
+      button_url: input.template.button_url,
     })
     .select()
     .single();

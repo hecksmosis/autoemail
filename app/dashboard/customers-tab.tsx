@@ -29,7 +29,7 @@ type Customer = {
 interface CustomersTabProps {
   initialCustomers: Customer[];
   tenantId: string;
-  fetchCustomers: () => Promise<void>; // Parent refresh function
+  fetchCustomers: () => Promise<void>;
 }
 
 export default function CustomersTab({
@@ -40,16 +40,15 @@ export default function CustomersTab({
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Local State
+  // Estado Local
   const [searchQuery, setSearchQuery] = useState("");
-  const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Modal State
+  // Estado Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
-  // Confirm Modal State
+  // Estado Confirmación
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -92,17 +91,17 @@ export default function CustomersTab({
   const handleDeleteCustomer = async (id: string, name: string) => {
     setConfirmModal({
       isOpen: true,
-      title: "Delete Customer",
-      message: `Are you sure you want to delete "${name}"? This cannot be undone.`,
+      title: "Eliminar Cliente",
+      message: `¿Estás seguro de que quieres eliminar a "${name}"? Esta acción no se puede deshacer.`,
       onConfirm: async () => {
         const { error } = await supabase
           .from("customers")
           .delete()
           .eq("id", id);
         if (error) {
-          toast.error("Failed to delete");
+          toast.error("Error al eliminar");
         } else {
-          toast.success("Customer deleted");
+          toast.success("Cliente eliminado");
           fetchCustomers();
         }
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
@@ -122,12 +121,12 @@ export default function CustomersTab({
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-      {/* Header */}
+      {/* Encabezado */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
           <p className="text-gray-400 mt-1">
-            Manage your client list and assign email campaigns.
+            Gestiona tu lista de clientes y asigna campañas de correo.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -137,17 +136,17 @@ export default function CustomersTab({
             className="h-9 px-4 rounded-md bg-white text-black text-sm font-medium hover:bg-gray-200 transition-colors flex items-center gap-2"
           >
             <Plus size={16} />
-            <span>Add Customer</span>
+            <span>Añadir Cliente</span>
           </button>
         </div>
       </div>
 
       <div className="grid gap-6">
-        {/* Stats & Drop Zone */}
+        {/* Estadísticas y Zona de Arrastre */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-6 rounded-xl border border-gray-800 bg-[#0A0A0A]">
             <div className="text-gray-500 text-sm font-medium uppercase">
-              Total Customers
+              Total Clientes
             </div>
             <div className="text-3xl font-bold mt-2 text-white">
               {initialCustomers.length}
@@ -155,19 +154,16 @@ export default function CustomersTab({
           </div>
           <div className="p-6 rounded-xl border border-gray-800 bg-[#0A0A0A]">
             <div className="text-gray-500 text-sm font-medium uppercase">
-              Active Reviews
+              Reseñas Activas
             </div>
             <div className="text-3xl font-bold mt-2 text-white">
               {initialCustomers.filter((c) => c.status === "reviewed").length}
             </div>
           </div>
 
-          {/* Quick Import Drop Zone */}
+          {/* Zona de Importación Rápida */}
           <div
             onClick={() => {
-              // Trigger the hidden input in CSVUploadWithMapping component via DOM is tricky
-              // simpler to just tell user to click the button above for now,
-              // or clone the logic. For now, let's keep it visual.
               document
                 .querySelector<HTMLButtonElement>(
                   "button[aria-label='Import CSV']",
@@ -189,19 +185,21 @@ export default function CustomersTab({
                 className={isDragging ? "text-white" : "text-gray-400"}
               />
             </div>
-            <p className="text-sm font-medium text-gray-300">Quick Import</p>
-            <p className="text-xs text-gray-500">Drag & drop CSV anywhere</p>
+            <p className="text-sm font-medium text-gray-300">
+              Importación Rápida
+            </p>
+            <p className="text-xs text-gray-500">Arrastra tu CSV aquí</p>
           </div>
         </div>
 
-        {/* Data Table */}
+        {/* Tabla de Datos */}
         <div className="border border-gray-800 rounded-xl overflow-visible bg-[#0A0A0A] min-h-[400px]">
           <div className="p-4 border-b border-gray-800 flex items-center justify-between">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
               <input
                 type="text"
-                placeholder="Search by name or email..."
+                placeholder="Buscar por nombre o correo..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full h-9 pl-9 pr-4 rounded-md bg-black border border-gray-800 text-sm text-gray-300 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white focus:border-white transition-all"
@@ -212,10 +210,10 @@ export default function CustomersTab({
             <table className="w-full text-left text-sm">
               <thead className="bg-gray-900/50 text-gray-400 font-medium">
                 <tr>
-                  <th className="px-6 py-3">Customer</th>
-                  <th className="px-6 py-3">Last Visit</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3 text-right">Actions</th>
+                  <th className="px-6 py-3">Cliente</th>
+                  <th className="px-6 py-3">Última Visita</th>
+                  <th className="px-6 py-3">Estado</th>
+                  <th className="px-6 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
@@ -225,9 +223,6 @@ export default function CustomersTab({
                     customer={customer}
                     onDelete={handleDeleteCustomer}
                     onUpdate={(id, updates) => {
-                      // Optimistic updates are handled by parent fetch,
-                      // but typically we'd update local state here.
-                      // For simplicity, trigger refresh.
                       fetchCustomers();
                     }}
                     onEdit={() => openEditModal(customer)}
@@ -236,7 +231,7 @@ export default function CustomersTab({
                 {filteredCustomers.length === 0 && (
                   <tr>
                     <td colSpan={4} className="p-8 text-center text-gray-500">
-                      No customers found.
+                      No se encontraron clientes.
                     </td>
                   </tr>
                 )}
@@ -246,7 +241,7 @@ export default function CustomersTab({
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* Modal Añadir/Editar */}
       {isModalOpen && (
         <CustomerModal
           tenantId={tenantId}
@@ -258,7 +253,7 @@ export default function CustomersTab({
         />
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Modal Confirmación */}
       {confirmModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-[#0A0A0A] border border-gray-800 rounded-xl shadow-2xl p-6 space-y-4">
@@ -282,13 +277,13 @@ export default function CustomersTab({
                 }
                 className="flex-1 h-10 rounded-md border border-gray-800 text-sm font-medium hover:bg-gray-900 transition-colors"
               >
-                Cancel
+                Cancelar
               </button>
               <button
                 onClick={confirmModal.onConfirm}
                 className="flex-1 h-10 rounded-md bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
               >
-                Delete
+                Eliminar
               </button>
             </div>
           </div>

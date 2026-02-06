@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const userInfo = await oauth2.userinfo.get();
 
     // 3. Save Encrypted Tokens to DB
-    await supabase
+    const { error: err } = await supabase
       .from("tenants")
       .update({
         email_provider: "google",
@@ -38,6 +38,8 @@ export async function GET(request: Request) {
         google_email_address: userInfo.data.email,
       })
       .eq("id", tenantId);
+
+    console.log(err);
 
     // 4. Redirect back to Dashboard Settings
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";

@@ -10,132 +10,134 @@ export default function TermsOfService() {
             href="/login"
             className="text-sm font-medium text-gray-400 hover:text-white transition-colors flex items-center gap-2"
           >
-            <ArrowLeft size={16} /> Back to Login
+            <ArrowLeft size={16} /> Volver al Inicio
           </Link>
         </div>
       </nav>
 
       <main className="max-w-4xl mx-auto px-6 py-12">
-        <h1 className="text-4xl font-bold mb-8">Terms of Service</h1>
+        <h1 className="text-4xl font-bold mb-8">Términos de Servicio</h1>
 
         <div className="space-y-8 text-gray-300 leading-relaxed">
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">
-              1. Acceptance of Terms
+              1. Condiciones de Servicio
             </h2>
             <p>
-              By accessing and using the GerpaTech platform ("Service"), you
-              agree to be bound by these Terms of Service. If you do not agree
-              to these terms, please do not use our Service.
+              Al acceder y utilizar la plataforma GerpaTech ("Servicio"),
+              aceptas estar sujeto a estos Términos de Servicio. Si no estás de
+              acuerdo con estos términos, por favor no utilices nuestro
+              Servicio.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">
-              2. Description of Service
+              2. Descripción del Servicio
             </h2>
             <p>
-              GerpaTech provides a software-as-a-service (SaaS) platform that
-              automates customer follow-ups, Google Review requests, and
-              retention email campaigns for local businesses.
+              GerpaTech proporciona una plataforma de software como servicio
+              (SaaS) que automatiza el seguimiento de clientes, solicitudes de
+              Reseñas de Google y campañas de correo electrónico de retención
+              para negocios locales.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">
-              3. Account Registration
+              3. Registro de Cuenta
             </h2>
             <p>
-              To use the Service, you must be provisioned an account by
-              GerpaTech administrators. You agree to provide accurate, current,
-              and complete information during the onboarding process and to
-              update such information to keep it accurate, current, and
-              complete.
+              Para utilizar el Servicio, los administradores de GerpaTech deben
+              aprovisionarte una cuenta. Aceptas proporcionar información
+              precisa, actual y completa durante el proceso de incorporación y
+              mantener dicha información actualizada.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">
-              4. User Responsibilities
+              4. Responsabilidades del Usuario
             </h2>
-            <p className="mb-2">You acknowledge and agree that:</p>
+            <p className="mb-2">Reconoces y aceptas que:</p>
             <ul className="list-disc pl-5 space-y-2">
               <li>
-                You have the necessary rights and consent to upload customer
-                data (email addresses, names) to the platform.
+                Tienes los derechos y el consentimiento necesarios para subir
+                datos de clientes (direcciones de correo, nombres) a la
+                plataforma.
               </li>
               <li>
-                You will not use the Service to send spam, unsolicited
-                commercial email, or content that violates any applicable laws.
+                No utilizarás el Servicio para enviar spam, correos comerciales
+                no solicitados o contenido que viole las leyes aplicables.
               </li>
               <li>
-                You are responsible for maintaining the security of your account
-                credentials.
+                Eres responsable de mantener la seguridad de las credenciales de
+                tu cuenta.
               </li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">
-              5. Google Data Usage
+              5. Uso de Datos de Google
             </h2>
             <p>
-              Our Service integrates with Google APIs to send emails on your
-              behalf. By using this integration, you agree to Google's Terms of
-              Service and our Privacy Policy regarding the limited use of your
-              data.
+              Nuestro Servicio se integra con las APIs de Google para enviar
+              correos en tu nombre. Al utilizar esta integración, aceptas los
+              Términos de Servicio de Google y nuestra Política de Privacidad
+              con respecto al uso limitado de tus datos.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">
-              6. Payment and Subscription
+              6. Pagos y Suscripción
             </h2>
             <p>
-              Services are provided on a subscription basis. Payment terms are
-              agreed upon manually prior to account provisioning. Failure to pay
-              agreed-upon fees may result in the suspension or termination of
-              your account.
+              Los servicios se proporcionan mediante suscripción. Los términos
+              de pago se acuerdan manualmente antes del aprovisionamiento de la
+              cuenta. El incumplimiento del pago de las tarifas acordadas puede
+              resultar en la suspensión o terminación de tu cuenta.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">
-              7. Limitation of Liability
+              7. Limitación de Responsabilidad
             </h2>
             <p>
-              To the maximum extent permitted by law, GerpaTech shall not be
-              liable for any indirect, incidental, special, consequential, or
-              punitive damages, including without limitation, loss of profits,
-              data, use, goodwill, or other intangible losses, resulting from
-              your use of the Service.
+              En la máxima medida permitida por la ley, GerpaTech no será
+              responsable de ningún daño indirecto, incidental, especial,
+              consecuente o punitivo, incluyendo sin limitación, pérdida de
+              beneficios, datos, uso, buena voluntad, u otras pérdidas
+              intangibles, resultantes de tu uso del Servicio.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">
-              8. Changes to Terms
+              8. Cambios en los Términos
             </h2>
             <p>
-              We reserve the right to modify these terms at any time. We will
-              provide notice of any significant changes by posting the new Terms
-              of Service on this page.
+              Nos reservamos el derecho de modificar estos términos en cualquier
+              momento. Notificaremos cualquier cambio significativo publicando
+              los nuevos Términos de Servicio en esta página.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-3">
-              9. Contact Us
+              9. Contacto
             </h2>
             <p>
-              For any questions regarding these Terms, please contact us at
-              support@gerpatech.com.
+              Para cualquier pregunta relacionada con estos Términos,
+              contáctanos en soporte@gerpatech.com.
             </p>
           </section>
         </div>
 
         <div className="mt-12 pt-8 border-t border-gray-800 text-sm text-gray-500">
-          Last Updated: February 2026
+          Última Actualización: Febrero 2026
         </div>
       </main>
     </div>

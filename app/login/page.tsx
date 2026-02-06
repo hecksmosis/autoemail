@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, Moon, Sun } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 function LoginContent() {
@@ -12,10 +12,9 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [theme, setTheme] = useState("dark");
 
   useEffect(() => {
-    document.documentElement.classList.add("dark"); // Default dark for GerpaTech branding
+    document.documentElement.classList.add("dark");
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -26,7 +25,7 @@ function LoginContent() {
       password,
     });
     if (error) {
-      toast.error(error.message);
+      toast.error("Credenciales incorrectas");
       setLoading(false);
     } else {
       router.push("/dashboard");
@@ -36,21 +35,23 @@ function LoginContent() {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-black text-white">
       <div className="relative w-full max-w-[400px] overflow-hidden rounded-2xl p-[1px]">
+        {/* Efecto de borde animado */}
         <div className="absolute inset-[-100%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#E2CBFF_0%,#393BB2_50%,#E2CBFF_100%)] opacity-70" />
+
         <div className="relative h-full w-full rounded-2xl bg-black px-8 py-12 shadow-xl border border-gray-800">
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
               GerpaTech
             </h1>
             <p className="text-sm text-gray-400">
-              Automation for Local Business
+              Automatización para Negocios Locales
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
-                Email
+                Correo Electrónico
               </label>
               <input
                 type="email"
@@ -62,7 +63,7 @@ function LoginContent() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
-                Password
+                Contraseña
               </label>
               <input
                 type="password"
@@ -80,12 +81,12 @@ function LoginContent() {
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                "Access Dashboard"
+                "Acceder al Panel"
               )}
             </button>
           </form>
           <div className="mt-6 text-center text-xs text-gray-600">
-            Protected Area. Authorized Personnel Only.
+            Área Protegida. Solo Personal Autorizado.
           </div>
         </div>
       </div>
@@ -95,7 +96,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div>Cargando...</div>}>
       <LoginContent />
     </Suspense>
   );

@@ -3,13 +3,13 @@ import {
   MoreHorizontal,
   Loader2,
   Trash2,
-  Zap,
   Mail,
   Pencil,
-  Clock,
   Calendar,
-  CheckCircle2,
   Tag,
+  Clock,
+  Zap,
+  CheckCircle2,
   History,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -62,20 +62,20 @@ export function EnhancedCustomerRow({
     if (result.success) {
       const now = new Date().toISOString();
       onUpdate(customer.id, { status: "contacted", last_contacted_at: now });
-      toast.success("Email sent successfully!");
+      toast.success("¡Correo enviado con éxito!");
     } else {
-      toast.error("Failed to send email: " + result.error);
+      toast.error("Error al enviar: " + result.error);
     }
   };
 
   const loadProgramStatus = async () => {
-    if (programStatus) return; // Already loaded
+    if (programStatus) return;
     setLoadingStatus(true);
     try {
       const status = await getCustomerProgramStatus(customer.id);
       setProgramStatus(status);
     } catch (error) {
-      console.error("Error loading program status:", error);
+      console.error("Error cargando estado del programa:", error);
     } finally {
       setLoadingStatus(false);
     }
@@ -96,7 +96,7 @@ export function EnhancedCustomerRow({
         <div className="font-medium text-white">{customer.name}</div>
         <div className="text-gray-500 text-xs">{customer.email}</div>
 
-        {/* Service Tag Display */}
+        {/* Etiqueta de Servicio */}
         {customer.service_tag && (
           <div className="mt-1 flex items-center gap-2">
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 text-xs">
@@ -106,11 +106,11 @@ export function EnhancedCustomerRow({
           </div>
         )}
 
-        {/* Program Status (appears after click/load) */}
+        {/* Estado del Programa (Carga al hacer clic) */}
         {loadingStatus && (
           <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
             <Loader2 size={12} className="animate-spin" />
-            Loading program...
+            Cargando programa...
           </div>
         )}
 
@@ -122,7 +122,7 @@ export function EnhancedCustomerRow({
                 {programStatus.programName}
               </span>
               <span className="text-gray-600">
-                ({programStatus.totalSteps} email
+                ({programStatus.totalSteps} correo
                 {programStatus.totalSteps !== 1 ? "s" : ""})
               </span>
             </div>
@@ -130,15 +130,15 @@ export function EnhancedCustomerRow({
             {programStatus.nextEmailDays !== null ? (
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <Clock size={12} />
-                Next email in {programStatus.nextEmailDays} days
+                Próximo en {programStatus.nextEmailDays} días
               </div>
             ) : (
-              <div className="text-xs text-gray-600">All emails sent</div>
+              <div className="text-xs text-gray-600">Todos enviados</div>
             )}
 
             {programStatus.daysSinceVisit !== null && (
               <div className="text-xs text-gray-600">
-                {programStatus.daysSinceVisit} days since last visit
+                {programStatus.daysSinceVisit} días desde visita
               </div>
             )}
           </div>
@@ -147,7 +147,7 @@ export function EnhancedCustomerRow({
         {programStatus && !programStatus.hasProgram && customer.service_tag && (
           <div className="mt-2 flex items-center gap-1 text-xs text-amber-500">
             <Calendar size={12} />
-            No program for this service
+            Sin programa para este servicio
           </div>
         )}
       </td>
@@ -194,7 +194,7 @@ export function EnhancedCustomerRow({
                 }}
                 className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-[#1A1A1A] rounded-md transition-colors text-left"
               >
-                <Pencil size={14} /> <span>Edit Details</span>
+                <Pencil size={14} /> <span>Editar Detalles</span>
               </button>
               <button
                 onClick={(e) => {
@@ -209,7 +209,7 @@ export function EnhancedCustomerRow({
                 ) : (
                   <Mail size={14} />
                 )}{" "}
-                <span>Send Review Email</span>
+                <span>Enviar Correo Reseña</span>
               </button>
               <div className="h-px bg-gray-800 my-1 mx-1" />
               <button
@@ -220,7 +220,7 @@ export function EnhancedCustomerRow({
                 }}
                 className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 rounded-md transition-colors text-left"
               >
-                <Trash2 size={14} /> <span>Delete Customer</span>
+                <Trash2 size={14} /> <span>Eliminar Cliente</span>
               </button>
             </div>
           </div>
@@ -243,71 +243,40 @@ function getEngagementStatus(customer: Customer) {
     lastEmailDays = Math.floor(contactDiff / (1000 * 60 * 60 * 24));
   }
 
-  // 1. Success State (Reviewed)
+  // 1. Estado de Éxito
   if (customer.status === "reviewed") {
     return (
       <div className="flex items-center gap-2 text-green-500">
         <CheckCircle2 size={16} />
-        <span className="text-sm font-medium">Review Received</span>
+        <span className="text-sm font-medium">Reseña Recibida</span>
       </div>
     );
   }
 
-  // 2. Engagement State
+  // 2. Estado de Compromiso
   return (
     <div className="space-y-1.5">
-      {/* Days Journey */}
+      {/* Días del viaje */}
       <div className="flex items-center gap-2 text-white">
-        <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+        <div
+          className={`h-2 w-2 rounded-full animate-pulse ${daysSinceVisit > 30 ? "bg-amber-500" : "bg-blue-500"}`}
+        />
         <span className="text-sm font-medium">
-          Day {daysSinceVisit} of Journey
+          Día {daysSinceVisit} del programa
         </span>
       </div>
 
-      {/* Last Contact Info */}
+      {/* Info Último Contacto */}
       <div className="flex items-center gap-1.5 text-xs text-gray-500">
         <History size={12} />
         {lastEmailDays !== null ? (
           <span>
-            Email sent{" "}
-            {lastEmailDays === 0 ? "today" : `${lastEmailDays} days ago`}
+            Correo hace {lastEmailDays === 0 ? "hoy" : `${lastEmailDays} días`}
           </span>
         ) : (
-          <span>No emails sent yet</span>
+          <span>Sin correos enviados</span>
         )}
       </div>
     </div>
-  );
-}
-
-function getStatusBadge(customer: Customer) {
-  if (customer.status === "reviewed")
-    return (
-      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400 border border-green-900">
-        Review Done
-      </span>
-    );
-  if (customer.status === "contacted")
-    return (
-      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-900/30 text-blue-400 border border-blue-900">
-        Email Sent
-      </span>
-    );
-  const diffDays = Math.ceil(
-    Math.abs(
-      new Date().getTime() - new Date(customer.last_visit_date).getTime(),
-    ) /
-      (1000 * 60 * 60 * 24),
-  );
-  if (diffDays > 30)
-    return (
-      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-900/30 text-amber-500 border border-amber-900">
-        At Risk
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-400 border border-gray-700">
-      Pending
-    </span>
   );
 }

@@ -40,15 +40,14 @@ export default function CustomerModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
 
-  // Fetch available programs to populate the dropdown
+  // Obtener programas disponibles
   useEffect(() => {
     const loadPrograms = async () => {
       try {
         const data = await getRetentionPrograms();
-        // Filter only enabled programs for new assignments
         setPrograms(data.filter((p) => p.enabled));
       } catch (e) {
-        console.error("Failed to load programs", e);
+        console.error("Error cargando programas", e);
       } finally {
         setLoadingPrograms(false);
       }
@@ -71,7 +70,7 @@ export default function CustomerModal({
       let result;
 
       if (initialData) {
-        // Update
+        // Actualizar
         const { data, error } = await supabase
           .from("customers")
           .update(payload)
@@ -80,9 +79,9 @@ export default function CustomerModal({
           .single();
         if (error) throw error;
         result = data;
-        toast.success("Customer updated");
+        toast.success("Cliente actualizado");
       } else {
-        // Create
+        // Crear
         const { data, error } = await supabase
           .from("customers")
           .insert({
@@ -93,13 +92,13 @@ export default function CustomerModal({
           .single();
         if (error) throw error;
         result = data;
-        toast.success("Customer added");
+        toast.success("Cliente añadido");
       }
 
       onSuccess(result);
       onClose();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error("Error: " + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -110,7 +109,7 @@ export default function CustomerModal({
       <div className="w-full max-w-md bg-[#0A0A0A] border border-gray-800 rounded-xl shadow-2xl animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between p-4 border-b border-gray-800">
           <h2 className="text-lg font-semibold text-white">
-            {initialData ? "Edit Customer" : "Add Customer"}
+            {initialData ? "Editar Cliente" : "Añadir Cliente"}
           </h2>
           <button
             onClick={onClose}
@@ -123,7 +122,7 @@ export default function CustomerModal({
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-500 uppercase">
-              Full Name
+              Nombre Completo
             </label>
             <input
               type="text"
@@ -133,13 +132,13 @@ export default function CustomerModal({
                 setFormData({ ...formData, name: e.target.value })
               }
               className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white focus:outline-none focus:ring-1 focus:ring-white"
-              placeholder="e.g. John Doe"
+              placeholder="ej. Juan Pérez"
             />
           </div>
 
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-500 uppercase">
-              Email Address
+              Correo Electrónico
             </label>
             <input
               type="email"
@@ -149,13 +148,13 @@ export default function CustomerModal({
                 setFormData({ ...formData, email: e.target.value })
               }
               className="w-full h-10 px-3 rounded-md bg-[#111] border border-gray-800 text-white focus:outline-none focus:ring-1 focus:ring-white"
-              placeholder="e.g. john@example.com"
+              placeholder="ej. juan@email.com"
             />
           </div>
 
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-500 uppercase">
-              Last Visit Date
+              Fecha Última Visita
             </label>
             <input
               type="date"
@@ -171,7 +170,7 @@ export default function CustomerModal({
           {/* CAMPAIGN SELECTION */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-gray-500 uppercase flex items-center gap-2">
-              Assigned Campaign (Program)
+              Campaña Asignada (Programa)
               {loadingPrograms && (
                 <Loader2 size={12} className="animate-spin" />
               )}
@@ -188,7 +187,7 @@ export default function CustomerModal({
                 }
                 className="w-full h-10 pl-10 pr-3 rounded-md bg-[#111] border border-gray-800 text-white focus:outline-none focus:ring-1 focus:ring-white appearance-none"
               >
-                <option value="">(No Campaign)</option>
+                <option value="">(Ninguna - Usar Global)</option>
                 {programs.map((program) => (
                   <option key={program.id} value={program.service_tag}>
                     {program.display_name}
@@ -213,7 +212,7 @@ export default function CustomerModal({
             </div>
             {formData.service && (
               <p className="text-xs text-blue-400 mt-1">
-                Matches program:{" "}
+                Coincide con programa:{" "}
                 {
                   programs.find((p) => p.service_tag === formData.service)
                     ?.display_name
@@ -221,8 +220,8 @@ export default function CustomerModal({
               </p>
             )}
             <p className="text-[10px] text-gray-600 mt-1">
-              Selecting a campaign sets the hidden "Service Tag" to match the
-              program.
+              Seleccionar una campaña asigna automáticamente la "Etiqueta de
+              Servicio" correspondiente.
             </p>
           </div>
 
@@ -232,7 +231,7 @@ export default function CustomerModal({
               onClick={onClose}
               className="flex-1 h-10 rounded-md border border-gray-800 text-sm font-medium hover:bg-gray-900 transition-colors"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
@@ -242,9 +241,9 @@ export default function CustomerModal({
               {isSubmitting ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : initialData ? (
-                "Update"
+                "Actualizar"
               ) : (
-                "Save"
+                "Guardar"
               )}
             </button>
           </div>
